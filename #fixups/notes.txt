@@ -1,0 +1,107 @@
+
+add these preprocessor definitions to both (debug/release) configurations:
+
+__ccram=__attribute__((section (".ccmram")))
+__ram2=__attribute__((section (".ram2")))
+__bkram=__attribute__((section (".bkram")))
+DEBUG=1
+USE_HAL_DRIVER
+STM32F407xx
+HAVE_USBCDC=1
+HAVE_UART1=1
+
+if you have occasion to use the dsp library, you will need to add these:
+
+ARM_MATH_CM4
+__FPU_PRESENT=1U
+
+
+alter the linker script to modify these values and setup these RAM sections:
+
+/* Highest address of the user mode stack */
+_estack = 0x2001c000;    /* end of RAM */
+
+RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 112K
+RAM2 (xrw)     : ORIGIN = 0x2001c000, LENGTH = 16K
+CCMRAM (xrw)   : ORIGIN = 0x10000000, LENGTH = 64K
+BKRAM (rw)     : ORIGIN = 0x40024000, LENGTH = 4K
+
+  _siccmram = LOADADDR(.ccmram);
+
+  /* CCM-RAM section 
+  * 
+  * IMPORTANT NOTE! 
+  * If initialized variables will be placed in this section,
+  * the startup code needs to be modified to copy the init-values.  
+  */
+  .ccmram :
+  {
+    . = ALIGN(4);
+    _sccmram = .;       /* create a global symbol at ccmram start */
+    *(.ccmram)
+    *(.ccmram*)
+    
+    . = ALIGN(4);
+    _eccmram = .;       /* create a global symbol at ccmram end */
+  } >CCMRAM AT> FLASH
+
+  _siram2 = LOADADDR(.ram2);
+
+  /* RAM2 section 
+  * 
+  * IMPORTANT NOTE! 
+  * If initialized variables will be placed in this section,
+  * the startup code needs to be modified to copy the init-values.  
+  */
+  .ram2 :
+  {
+    . = ALIGN(4);
+    _sram2 = .;       /* create a global symbol at ram2 start */
+    *(.ram2)
+    *(.ram2*)
+    
+    . = ALIGN(4);
+    _eram2 = .;       /* create a global symbol at ram2 end */
+  } >RAM2 AT> FLASH
+
+  _sibkram = LOADADDR(.bkram);
+
+  /* BKRAM section 
+  * The backup ram is battery backed, so it makes no sense to init it at boot.
+  */
+  .bkram :
+  {
+    . = ALIGN(4);
+    _sbkram = .;       /* create a global symbol at bkram start */
+    *(.bkram)
+    *(.bkram*)
+    
+    . = ALIGN(4);
+    _ebkram = .;       /* create a global symbol at bkram end */
+  } >BKRAM
+
+
+
+add these linker options to both (debug/release) 'Miscellaneous' to cause 'library interpositioning' of malloc/free internal to libc to be redirected to our heap implementation:
+
+ -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,realloc -Wl,--wrap,calloc -Wl,--wrap,_malloc_r -Wl,--wrap,_free_r -Wl,--wrap,_realloc_r -Wl,--wrap,_calloc_r
+
+
+add these lines in the bottom 'USER CODE' section in inc/FreeRTOSConfig.h:
+
+//override memory selection made in STM32CubeMX, and explicitly support
+//FreeRTOS dynamic memory management.  However, we will be providing our own
+//heap implementation (derived from heap4.c, but with realloc implemented)
+#undef configAPPLICATION_ALLOCATED_HEAP
+#define configAPPLICATION_ALLOCATED_HEAP 1
+
+#undef configMALLOC_FILL
+#define configMALLOC_FILL 1
+
+
+run 'fixups.bat' to apply some patches into the generated USB CDC files.  Unfortunately, not all these changes are in USER code sections, and so they will get overwritten if you regenerate from STM32CubeMX.  Moreover, you need to reevaluate these changes with new firmware updates, possibly porting them forward (it's getting easier, though).
+
+copy the heap_x.c implementation into /src.  This used to be required to be done in the source tree, but CubeMX now has an option to not emit the out-of-box heap implementation, but you still have to copy your implementation into src (or wherever) at least once.
+
+/after/ you build and 'Debug As... Ac6 STM32 C/C++ Application', a debug configuration file will be generated.  After this has been done the first time, you can then go to 'Debug Configurations...' and on the 'Startup' tab, near the bottom, is setting in 'Runtime Options' named 'Set breakpoint at:' that you can uncheck to get rid of the automatically generated breakpoint at the start of main.
+

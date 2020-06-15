@@ -1,0 +1,23 @@
+20180831a - this includes
+  *  SWD debugging.  The board brings out all JTAG to the standard connector, so take care if reusing the JTAG pins for something else because they do still go to that connector.  (I don't know how ST/Link reacts in that scenario -- are they hi-z?).  This board brings out NRST, so you don't have to fiddle with 'software reset' in the debug config.
+  *  basic on-board hardware: leds, buttons
+  *  Sys Wakeup.  this goes to a button on the board, but there is no handling in software at this time.
+  *  SPI1 for the Flash chip.  I/O code not included; just the SPI1 setup
+  *  SDIO 4-bit mode for the SD card
+  *  in CubeMX you need to specify both RX and TX DMA channels for the SDIO.  And the global interrupt.
+  *  a hack 'BOGO_CARDDETECT' on an unused GPIO -- this is necessary to please STM32CubeMX for the FatFS middleware during code generation
+  *  FatFS middleware for SDIO -- verified functional with an SD card
+  *  FatFS calls uses a fair amount of stack -- verify with monitor 'diag' command
+  *  FreeRTOS with my usual configuration options.  In particular, my augmented heap implementation.  There is the usual #fixups/fixup.bat to help with re-applying that after a code regeneration.
+  *  in CubeMX there now is an option to cause the default heap_4.c to not be emitted; this is in the FreeRTOS 'advance' section.
+  *  This board has three memory regions, and CubeMX puts everything in the default which is the 112 + 16 = 128 KiB general purpose region of SRAM1 || SRAM2.  I moved some objects (like FreeRTOS tasks) into the CCM region.  This can be seen in the early part of main.c to see how to do this.  It was a little hassle because of the code generation process, so you will have to keep vigilant after code generation to maintain this, but the build will break if you don't so it is pretty easy to see when/what you must do to address it.  Comments with details.
+  *  USB configured as CDC.
+  *  my serial stream abstraction and USB CDC fixup hacks.
+  *  USART1 setup.  this is brought out to a header on the board, so it could be used for hard serial debug as an alternative to USB CDC, or perhaps for something else.
+  *  I added the 'DEBUG' define for the debug build only
+  *  I added the __ccram=__attribute__((section (".ccmram"))) define for all configs to make it easier to locate some data object in the core-coupled ram section.  Note:  no init of values without extra effort.  linker script modified.
+  *  similarly, I added the __ram2=__attribute__((section (".ram2"))) define for all configs to make it easier to locate some data object in the second ram section.  This second ram block has a separate port on the bus matrix, and can be used to reduce bus contention in special cases (e.g. hard real time with DMA).  linker script modified.
+  *  similarly, I added the __bkram=__attribute__((section (".bkram"))) define for all configs to make it easier to locate some data object in the 'backup ram'.  This 4k section of ram can be make to be non-volatile so long as the battery is attached (you have to do some config on the PWR unit to make it happen).  Since this is intended to be non-volatile, it makes no sense to init it at boot time.  linker script modified.
+  *  you need to specify one of HAVE_USBCDC=-1 OR HAVE_UART1=1 to indicate which will be used for the monitor task.
+  *  I set gcc optimization 'Place the data in their own section' -fdata-sections to help the linker discard unused constant data.  I don't really have any yet, but I might eventually.
+  *  I implemented the 'default' task as per yoosh with the LEDs and resource usage stats.
