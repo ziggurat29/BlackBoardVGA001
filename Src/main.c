@@ -6,13 +6,13 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
+  * This software component is licensed by ST under BSD 3-Clause license,
+  * the "License"; You may not use this file except in compliance with the
+  * License. You may obtain a copy of the License at:
+  *                        opensource.org/licenses/BSD-3-Clause
   *
   ******************************************************************************
   */
@@ -113,7 +113,6 @@ void* __wrap__realloc_r ( struct _reent* r, void* pv, size_t size ) { return pvP
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -127,9 +126,15 @@ void* __wrap__realloc_r ( struct _reent* r, void* pv, size_t size ) { return pvP
 //main SRAM since the CCRAM is otherwise going unused.
 
 
+//XXX generated code hack; we put things right where we want them to be, above.
+//If you get some linker errors after you modify the CubeMX project, it might
+//be that it added stuff during generation, below, and that is conditioned-out.
+//So just copy whatever it is above.
+#if 1
+
 RTC_HandleTypeDef hrtc __ccram;
-SD_HandleTypeDef hsd __ccram;
 //DMA 'handles' cannot be in CCM because the DMA controller will access some members and CCM is inaccessible to the DMA controllers.
+SD_HandleTypeDef hsd;// __ccram;
 DMA_HandleTypeDef hdma_sdio_rx;// __ccram;
 DMA_HandleTypeDef hdma_sdio_tx;// __ccram;
 SPI_HandleTypeDef hspi1 __ccram;
@@ -139,12 +144,7 @@ osThreadId defaultTaskHandle __ccram;
 uint32_t defaultTaskBuffer[ 128 ] __ccram;
 osStaticThreadDef_t defaultTaskControlBlock __ccram;
 
-
-//XXX generated code hack; we put things right where we want them to be, above.
-//If you get some linker errors after you modify the CubeMX project, it might
-//be that it added stuff during generation, below, and that is conditioned-out.
-//So just copy whatever it is above.
-#if 0
+#else
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -424,7 +424,7 @@ static void MX_SDIO_SD_Init(void)
   hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
   hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
   hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd.Init.ClockDiv = 118;
+  hsd.Init.ClockDiv = 0;
   /* USER CODE BEGIN SDIO_Init 2 */
 
   /* USER CODE END SDIO_Init 2 */
@@ -840,8 +840,26 @@ void StartDefaultTask(void const * argument)
 	g_pMonitorIOIf = &g_pifUART1;	//monitor is on UART1
 #endif
 
-#if 0
+#if 1
 	{
+		/*
+		NOTE: There are some goofy defines in fatfs.h/.c in generated code:
+
+		uint8_t retSD;    // Return value for SD
+		char SDPath[4];   // SD logical drive path
+		FATFS SDFatFS;    // File system object for SD logical drive
+		FIL SDFile;       // File object for SD
+		
+		The last two are not used anywhere in the 'middleware', so feel free
+		to ignore them and define your own.  if you use 'data sections' in the
+		linker config, they will be discarded.
+
+		The first two are unfortunately used, so you have to work harder to
+		make them go away.  But... they are only used in MX_FATFS_Init(), which
+		in turn only does FATFS_LinkDriver(), so you could do some magicry to
+		make those go away, too.
+		*/
+
 		//Register the file system object to the FatFs module
 		//note; the SDFatFS and SDPath are in fatfs.h (why?)
 		SDPath[0] = '0';
@@ -876,10 +894,41 @@ void StartDefaultTask(void const * argument)
 				}
 				else
 				{
-					/* Close the open text file */
-					f_close ( &SDFile );
+					//YYY something
 				}
+
+				/* Close the open text file */
+				f_close ( &SDFile );
 			}
+
+			//Open the text file object with write access
+			//note; the SDFile is in fatfs.h (why?)
+			if ( f_open ( &SDFile, "dummy2.txt", FA_CREATE_ALWAYS | FA_WRITE | FA_READ ) != FR_OK)
+			{
+				//'dummy2.txt' file Open for write Error
+				Error_Handler();
+			}
+			else
+			{
+				//Write data to the text file
+				uint32_t byteswritten;
+				static char szText[] = "lalalililulu\n";
+				fr = f_write ( &SDFile, szText, strlen(szText), (void *)&byteswritten );
+				if ( ( byteswritten == 0 ) || ( fr != FR_OK ) )
+				{
+					//'dummy.txt' file Write error or disk full
+					Error_Handler();
+				}
+				else
+				{
+					//YYY something
+				}
+
+				/* Close the open text file */
+				f_close ( &SDFile );
+			}
+
+
 
 			f_mount ( NULL, (TCHAR const*)"", 0 );
 		}
