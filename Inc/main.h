@@ -88,6 +88,10 @@ void Error_Handler(void);
 #define B0_GPIO_Port GPIOE
 #define B1_Pin GPIO_PIN_15
 #define B1_GPIO_Port GPIOE
+#define PS2_CK_Pin GPIO_PIN_6
+#define PS2_CK_GPIO_Port GPIOC
+#define PS2_DATA_Pin GPIO_PIN_7
+#define PS2_DATA_GPIO_Port GPIOC
 #define FLASH_SCK_Pin GPIO_PIN_3
 #define FLASH_SCK_GPIO_Port GPIOB
 #define FLASH_MISO_Pin GPIO_PIN_4
