@@ -350,7 +350,9 @@ static void MX_RTC_Init(void)
 {
 
   /* USER CODE BEGIN RTC_Init 0 */
-
+	//I don't know why I have to do this, but if I don't the following Init
+	//and SetXXX functions will fail, seemingly randomly.
+	__HAL_RCC_RTC_ENABLE();
   /* USER CODE END RTC_Init 0 */
 
   RTC_TimeTypeDef sTime = {0};
@@ -374,7 +376,13 @@ static void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
-    
+	//if we've already initted the clock, do not reset the time/date
+	if ( hrtc.Instance->ISR & RTC_FLAG_INITS )
+	{
+		__HAL_RTC_WRITEPROTECTION_DISABLE(&hrtc);
+	}
+	else
+	{
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date 
@@ -389,15 +397,16 @@ static void MX_RTC_Init(void)
     Error_Handler();
   }
   sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-  sDate.Month = RTC_MONTH_JANUARY;
+  sDate.Month = RTC_MONTH_JUNE;
   sDate.Date = 0x1;
-  sDate.Year = 0x0;
+  sDate.Year = 0x20;
 
   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
   {
     Error_Handler();
   }
   /* USER CODE BEGIN RTC_Init 2 */
+	}
 
   /* USER CODE END RTC_Init 2 */
 
