@@ -237,6 +237,15 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
+	//turn on the low power regulator so the backup sram will indeed be battery backed
+	HAL_PWR_EnableBkUpAccess();	//ensure access to the backup domain, if not already
+	__HAL_RCC_PWR_CLK_ENABLE();	//ensure the power clock is on, if not already
+	HAL_PWREx_EnableBkUpReg();	//turn on the backup regulator and wait for stabilization
+	//leave access to the backup domain active so we can freely fiddle with rtc, etc
+
+	//enable the backup sram clock, and just leave it running so we can access freely
+	__HAL_RCC_BKPSRAM_CLK_ENABLE();	//enable the backup sram clock
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -810,6 +819,24 @@ void StartDefaultTask(void const * argument)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
 
+	//
+
+	// Write to Backup SRAM with 32-Bit Data
+#if 0
+	for (uint32_t i = 0x0; i < 0x100; i += 4) {
+		*(__IO uint32_t*)(BKPSRAM_BASE + i) = i;
+	}
+#endif
+
+#if 0
+	// Check the written Data
+	for (uint32_t i = 0x0; i < 0x100; i += 4) {
+		if ((*(__IO uint32_t*)(BKPSRAM_BASE + i)) != i){
+			Error_Handler();
+		}
+	}
+#endif
+
 	//crank up serial ports
 #if HAVE_UART1
 	UART1_Init();	//UART1, alternative monitor
@@ -828,7 +855,7 @@ void StartDefaultTask(void const * argument)
 	g_pMonitorIOIf = &g_pifUART1;	//monitor is on UART1
 #endif
 
-#if 1
+#if 0
 	{
 		/*
 		NOTE: There are some goofy defines in fatfs.h/.c in generated code:
