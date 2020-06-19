@@ -12,12 +12,14 @@
   *  in CubeMX there now is an option to cause the default heap_4.c to not be emitted; this is in the FreeRTOS 'advance' section.
   *  This board has three memory regions, and CubeMX puts everything in the default which is the 112 + 16 = 128 KiB general purpose region of SRAM1 || SRAM2.  I moved some objects (like FreeRTOS tasks) into the CCM region.  This can be seen in the early part of main.c to see how to do this.  It was a little hassle because of the code generation process, so you will have to keep vigilant after code generation to maintain this, but the build will break if you don't so it is pretty easy to see when/what you must do to address it.  Comments with details.
   *  USB configured as CDC.
-  *  my serial stream abstraction and USB CDC fixup hacks.
+  *  my serial stream abstraction and USB CDC fixup hacks.  The fixups have been updated to hal lib 1.25.0
   *  USART1 setup.  this is brought out to a header on the board, so it could be used for hard serial debug as an alternative to USB CDC, or perhaps for something else.
   *  I added the 'DEBUG' define for the debug build only
   *  I added the __ccram=__attribute__((section (".ccmram"))) define for all configs to make it easier to locate some data object in the core-coupled ram section.  Note:  no init of values without extra effort.  linker script modified.
   *  similarly, I added the __ram2=__attribute__((section (".ram2"))) define for all configs to make it easier to locate some data object in the second ram section.  This second ram block has a separate port on the bus matrix, and can be used to reduce bus contention in special cases (e.g. hard real time with DMA).  linker script modified.
   *  similarly, I added the __bkram=__attribute__((section (".bkram"))) define for all configs to make it easier to locate some data object in the 'backup ram'.  This 4k section of ram can be make to be non-volatile so long as the battery is attached (you have to do some config on the PWR unit to make it happen).  Since this is intended to be non-volatile, it makes no sense to init it at boot time.  linker script modified.
   *  you need to specify one of HAVE_USBCDC=-1 OR HAVE_UART1=1 to indicate which will be used for the monitor task.
-  *  I set gcc optimization 'Place the data in their own section' -fdata-sections to help the linker discard unused constant data.  I don't really have any yet, but I might eventually.
+  *  I set gcc optimization 'Place the data in their own section' -fdata-sections to help the linker discard unused constant data.  There's some junk in fatfs.c (some global file handles and paths).  It's easier in this case to define your own, ignoring these, and let the linker delete them, than to hack generated code and do 'fixups'.
   *  I implemented the 'default' task as per yoosh with the LEDs and resource usage stats.
+  *  I had to manually call __HAL_RCC_RTC_ENABLE() in MX_RTC_Init().  Without this explicit call, 'randomly' the calls to HAL_RTC_Init() would fail.
+  *  I added some testing of RTC_FLAG_INITS to avoid setting the RTC if it has been set already.  The generated code sets the clock on every boot, but that rather defeats the utility of a battery-backed RTC.
