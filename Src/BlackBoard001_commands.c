@@ -206,7 +206,7 @@ static int _setDate ( const IOStreamIF* pio, const char* pszDate )
 
 	HAL_PWR_EnableBkUpAccess();	//... and leave it that way
 
-	RTC_DateTypeDef sDate;
+	RTC_DateTypeDef sDate = {0};
 	sDate.WeekDay = RTC_WEEKDAY_SUNDAY;	//(arbitrary)
 	sDate.Date = my_atoul ( &achDate[6], NULL );
 	achDate[6] = '\0';
@@ -237,13 +237,16 @@ static int _setTime ( const IOStreamIF* pio, const char* pszTime )
 	}
 
 	HAL_PWR_EnableBkUpAccess();	//... and leave it that way
-	RTC_TimeTypeDef sTime;
+	RTC_TimeTypeDef sTime = {0};
 	//careful:  the following works only because an empty field == zero
 	sTime.Seconds = my_atoul ( &achTime[4], NULL );
 	achTime[4] = '\0';
 	sTime.Minutes = my_atoul ( &achTime[2], NULL );
 	achTime[2] = '\0';
 	sTime.Hours = my_atoul ( &achTime[0], NULL );
+	//and the other stuff
+	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+	sTime.StoreOperation = RTC_STOREOPERATION_RESET;
 	HAL_RTC_SetTime ( &hrtc, &sTime, RTC_FORMAT_BIN );
 
 	return 1;
