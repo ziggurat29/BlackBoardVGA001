@@ -142,7 +142,9 @@ SD_HandleTypeDef hsd;// __ccram;
 DMA_HandleTypeDef hdma_sdio_rx;// __ccram;
 DMA_HandleTypeDef hdma_sdio_tx;// __ccram;
 SPI_HandleTypeDef hspi1 __ccram;
+TIM_HandleTypeDef htim4;// __ccram;
 UART_HandleTypeDef huart1 __ccram;
+DMA_HandleTypeDef hdma_memtomem_dma2_stream5;// __ccram;
 
 osThreadId defaultTaskHandle __ccram;
 uint32_t defaultTaskBuffer[ 128 ] __ccram;
@@ -164,8 +166,11 @@ DMA_HandleTypeDef hdma_sdio_tx;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim4;
+
 UART_HandleTypeDef huart1;
 
+DMA_HandleTypeDef hdma_memtomem_dma2_stream5;
 osThreadId defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 128 ];
 osStaticThreadDef_t defaultTaskControlBlock;
@@ -185,6 +190,7 @@ static void MX_SDIO_SD_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_DAC_Init(void);
+static void MX_TIM4_Init(void);
 void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
@@ -266,6 +272,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_FATFS_Init();
   MX_DAC_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -542,6 +549,80 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 1;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 1055;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_OC_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 128;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_TIMING;
+  sConfigOC.Pulse = 216;
+  if (HAL_TIM_OC_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.Pulse = 1016;
+  if (HAL_TIM_OC_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -576,6 +657,8 @@ static void MX_USART1_UART_Init(void)
 
 /** 
   * Enable DMA controller clock
+  * Configure DMA for memory to memory transfers
+  *   hdma_memtomem_dma2_stream5
   */
 static void MX_DMA_Init(void) 
 {
@@ -583,6 +666,25 @@ static void MX_DMA_Init(void)
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
   __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* Configure DMA request hdma_memtomem_dma2_stream5 on DMA2_Stream5 */
+  hdma_memtomem_dma2_stream5.Instance = DMA2_Stream5;
+  hdma_memtomem_dma2_stream5.Init.Channel = DMA_CHANNEL_0;
+  hdma_memtomem_dma2_stream5.Init.Direction = DMA_MEMORY_TO_MEMORY;
+  hdma_memtomem_dma2_stream5.Init.PeriphInc = DMA_PINC_ENABLE;
+  hdma_memtomem_dma2_stream5.Init.MemInc = DMA_MINC_DISABLE;
+  hdma_memtomem_dma2_stream5.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+  hdma_memtomem_dma2_stream5.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+  hdma_memtomem_dma2_stream5.Init.Mode = DMA_NORMAL;
+  hdma_memtomem_dma2_stream5.Init.Priority = DMA_PRIORITY_VERY_HIGH;
+  hdma_memtomem_dma2_stream5.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
+  hdma_memtomem_dma2_stream5.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+  hdma_memtomem_dma2_stream5.Init.MemBurst = DMA_MBURST_SINGLE;
+  hdma_memtomem_dma2_stream5.Init.PeriphBurst = DMA_PBURST_INC4;
+  if (HAL_DMA_Init(&hdma_memtomem_dma2_stream5) != HAL_OK)
+  {
+    Error_Handler( );
+  }
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
@@ -628,7 +730,7 @@ static void MX_GPIO_Init(void)
                           |G1_Pin|G2_Pin|B0_Pin|B1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, HSYNC_Pin|VSYNC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : KEY1_Pin KEY0_Pin */
   GPIO_InitStruct.Pin = KEY1_Pin|KEY0_Pin;
@@ -677,12 +779,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(PS2_DATA_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : HSYNC_Pin VSYNC_Pin */
-  GPIO_InitStruct.Pin = HSYNC_Pin|VSYNC_Pin;
+  /*Configure GPIO pin : VSYNC_Pin */
+  GPIO_InitStruct.Pin = VSYNC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(VSYNC_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI3_IRQn, 5, 0);
@@ -690,6 +792,9 @@ static void MX_GPIO_Init(void)
 
   HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 
@@ -1024,6 +1129,10 @@ void StartDefaultTask(void const * argument)
 		volatile int i = 0;
 	}
 
+	//testing tweaking the vsync line
+	{ HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_SET); }
+	{ HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_RESET); }
+
 /*
 	//Infinite loop
 	for(;;)
@@ -1033,6 +1142,43 @@ void StartDefaultTask(void const * argument)
 		osDelay(500);
 	}
 */
+
+	//this must be done to get the PWM output started
+	//'ideal' 800x600x60 timings if we can have a 160 MHz clock
+	htim4.Instance->PSC = 1;		//divide (160/2) /(1+1) = 40 MHz pix clock
+	//htim4.Instance->ARR = 1055;		//line time+1 = (128+88+800+40) pix 26.4 us
+	//htim4.Instance->CCR1 = 128;		//hsync
+	//htim4.Instance->CCR2 = 216;		//pix start
+	//htim4.Instance->CCR3 = 1016;	//pix end
+	//but 160 MHz means we can't have USB.  Attempt to approximate with 168 MHz; +5%
+	htim4.Instance->ARR = 1107;		//line time+1 = 26.38 us
+	htim4.Instance->CCR1 = 134;
+	htim4.Instance->CCR2 = 227;
+	htim4.Instance->CCR3 = 1067;
+	//set the hsync polarity as needed (positive)
+	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | 0;
+
+/*
+	//640x480x60 approximation at 168 MHz
+	htim4.Instance->ARR = 1334;		//line time+1 = 31.76 us, 31.48 kHz
+	htim4.Instance->CCR1 = 160;
+	htim4.Instance->CCR2 = 240;
+	htim4.Instance->CCR3 = 1308;
+
+	//set the hsync polarity as needed (negative)
+	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | TIM_CCER_CC1P;
+*/
+
+	HAL_TIM_Base_Start(&htim4); //Starts the TIM Base generation
+	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)//Starts the PWM signal generation
+	{
+		Error_Handler();	//horror
+	}
+
+
+	//light some lamps on a countdown
+	LightLamp ( 1000, &g_lltD2, _ledOnD2 );
+	LightLamp ( 2000, &g_lltD3, _ledOnD3 );
 
 	//start up worker threads
 	__startWorkerTasks();
@@ -1134,7 +1280,12 @@ void StartDefaultTask(void const * argument)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
-
+	if (htim->Instance == TIM4) {
+		//XXX do VGA state machine
+		volatile int i = 0;
+		(void)i;
+	}
+	else
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM12) {
     HAL_IncTick();
