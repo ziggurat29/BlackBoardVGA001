@@ -39,6 +39,8 @@
 
 #include "task_monitor.h"
 
+#include "video.h"
+
 
 //get the debug cycle counter as a high-resolution clock
 uint32_t inline getCyCnt() { return DWT->CYCCNT; }
@@ -142,9 +144,10 @@ SD_HandleTypeDef hsd;// __ccram;
 DMA_HandleTypeDef hdma_sdio_rx;// __ccram;
 DMA_HandleTypeDef hdma_sdio_tx;// __ccram;
 SPI_HandleTypeDef hspi1 __ccram;
+TIM_HandleTypeDef htim1;// __ccram;
 TIM_HandleTypeDef htim4;// __ccram;
+DMA_HandleTypeDef hdma_tim1_up;// __ccram;
 UART_HandleTypeDef huart1 __ccram;
-DMA_HandleTypeDef hdma_memtomem_dma2_stream5;// __ccram;
 
 osThreadId defaultTaskHandle __ccram;
 uint32_t defaultTaskBuffer[ 128 ] __ccram;
@@ -166,11 +169,12 @@ DMA_HandleTypeDef hdma_sdio_tx;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim4;
+DMA_HandleTypeDef hdma_tim1_up;
 
 UART_HandleTypeDef huart1;
 
-DMA_HandleTypeDef hdma_memtomem_dma2_stream5;
 osThreadId defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 128 ];
 osStaticThreadDef_t defaultTaskControlBlock;
@@ -191,6 +195,7 @@ static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_DAC_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_TIM1_Init(void);
 void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
@@ -273,6 +278,7 @@ int main(void)
   MX_FATFS_Init();
   MX_DAC_Init();
   MX_TIM4_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -549,6 +555,52 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 3;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief TIM4 Initialization Function
   * @param None
   * @retval None
@@ -657,8 +709,6 @@ static void MX_USART1_UART_Init(void)
 
 /** 
   * Enable DMA controller clock
-  * Configure DMA for memory to memory transfers
-  *   hdma_memtomem_dma2_stream5
   */
 static void MX_DMA_Init(void) 
 {
@@ -666,25 +716,6 @@ static void MX_DMA_Init(void)
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
   __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* Configure DMA request hdma_memtomem_dma2_stream5 on DMA2_Stream5 */
-  hdma_memtomem_dma2_stream5.Instance = DMA2_Stream5;
-  hdma_memtomem_dma2_stream5.Init.Channel = DMA_CHANNEL_0;
-  hdma_memtomem_dma2_stream5.Init.Direction = DMA_MEMORY_TO_MEMORY;
-  hdma_memtomem_dma2_stream5.Init.PeriphInc = DMA_PINC_ENABLE;
-  hdma_memtomem_dma2_stream5.Init.MemInc = DMA_MINC_DISABLE;
-  hdma_memtomem_dma2_stream5.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
-  hdma_memtomem_dma2_stream5.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-  hdma_memtomem_dma2_stream5.Init.Mode = DMA_NORMAL;
-  hdma_memtomem_dma2_stream5.Init.Priority = DMA_PRIORITY_VERY_HIGH;
-  hdma_memtomem_dma2_stream5.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
-  hdma_memtomem_dma2_stream5.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
-  hdma_memtomem_dma2_stream5.Init.MemBurst = DMA_MBURST_SINGLE;
-  hdma_memtomem_dma2_stream5.Init.PeriphBurst = DMA_PBURST_INC4;
-  if (HAL_DMA_Init(&hdma_memtomem_dma2_stream5) != HAL_OK)
-  {
-    Error_Handler( );
-  }
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
@@ -696,6 +727,9 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+  /* DMA2_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
   /* DMA2_Stream6_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
@@ -1129,9 +1163,8 @@ void StartDefaultTask(void const * argument)
 		volatile int i = 0;
 	}
 
-	//testing tweaking the vsync line
-	{ HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_SET); }
-	{ HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_RESET); }
+	//set up the video subsystem
+	Video_Initialize();
 
 /*
 	//Infinite loop
@@ -1169,7 +1202,7 @@ void StartDefaultTask(void const * argument)
 	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | TIM_CCER_CC1P;
 */
 
-	HAL_TIM_Base_Start(&htim4); //Starts the TIM Base generation
+	HAL_TIM_Base_Start_IT(&htim4); //Starts the TIM Base generation
 	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)//Starts the PWM signal generation
 	{
 		Error_Handler();	//horror
