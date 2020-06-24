@@ -1033,6 +1033,27 @@ static void MX_SPI1_Init_Flash(void)
 #endif
 
 
+
+//====================================================
+//hooks related to video support
+
+
+//TIM4 OC3 is used to signal end of scan line
+//XXX may become DMA transfer complete
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim)
+{
+	//currently we know this is from TIM4 OC3
+//	if (htim->Instance == TIM4) {
+		//XXX do VGA state machine
+		volatile int i = 0;
+		(void)i;
+		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
+//	}
+//	else
+}
+
+
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -1231,15 +1252,23 @@ void StartDefaultTask(void const * argument)
 	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | TIM_CCER_CC1P;
 */
 
-	HAL_TIM_Base_Start_IT(&htim4); //Starts the TIM Base generation
-	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)//Starts the PWM signal generation
+	HAL_TIM_Base_Start_IT(&htim4); //Starts the sync generation
+	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)//Starts the HSYNC signal generation
+	{
+		Error_Handler();	//horror
+	}
+	if (HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_2) != HAL_OK)//Starts the start of scan trigger
+	{
+		Error_Handler();	//horror
+	}
+	if (HAL_TIM_OC_Start_IT(&htim4, TIM_CHANNEL_3) != HAL_OK)//Starts the end of scan interrupt
 	{
 		Error_Handler();	//horror
 	}
 
 //XXX
-	HAL_TIM_Base_Start(&htim1); //Starts the TIM Base generation
-	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)//Starts the OC signal generation
+	//HAL_TIM_Base_Start(&htim1); //Starts the pix clock generation
+	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)//Starts the pix clock signal generation
 	{
 		Error_Handler();	//horror
 	}
@@ -1353,6 +1382,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		//XXX do VGA state machine
 		volatile int i = 0;
 		(void)i;
+		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
 	}
 	else
   /* USER CODE END Callback 0 */

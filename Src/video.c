@@ -20,12 +20,14 @@
 //PB6:  used as HSYNC from TIM4CH1
 //TIM4:  horizontal line timing; drives the state machine
 //  OC1:  used in PWM mode to create the HSYNC pulse
-//  OC2:  used to trigger the start of video out
-//  OC3:  used to trigger the end-of video out (XXX may change to the DMA complete interrupt)
+//  OC2:  used to trigger the start of video out; set as TRGO
+//  OC3:  used to interrupt at end of scan line (XXX may change to the DMA complete interrupt)
 //        this gives the maximum amount of time to prep the next line into the scanline buffer
 
-//TIM1:  drive dma pixel clock
-//DMA2CH5:  move pixels
+//TIM1:  drive dma pixel clock; set in slave mode, gated, from ITR3 (TIM4)
+//  OC1:  used in PWM mode to provide pix clock for testing
+//DMA2CH5:  move pixels to port E high byte
+
 
 //__ram2:  a 16 kiB memory section that has a separate port on the bus matrix,
 //         and so can be (carefully) used with DMA2 to have contention free
