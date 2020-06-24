@@ -567,6 +567,7 @@ static void MX_TIM1_Init(void)
   /* USER CODE END TIM1_Init 0 */
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
   TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
@@ -591,6 +592,12 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_GATED;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR3;
+  if (HAL_TIM_SlaveConfigSynchro(&htim1, &sSlaveConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -685,12 +692,12 @@ static void MX_TIM4_Init(void)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_TIMING;
   sConfigOC.Pulse = 216;
-  if (HAL_TIM_OC_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }
+  sConfigOC.OCMode = TIM_OCMODE_TIMING;
   sConfigOC.Pulse = 1016;
   if (HAL_TIM_OC_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
   {
@@ -1047,7 +1054,16 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim)
 		//XXX do VGA state machine
 		volatile int i = 0;
 		(void)i;
-		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
+//		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
+
+		htim1.Instance->CNT = 0;	//reset to be ready for next gating
+//		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+//		if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)	//Starts the pix clock test signal generation
+//		{
+//			Error_Handler();	//horror
+//		}
+
+
 //	}
 //	else
 }
@@ -1252,23 +1268,23 @@ void StartDefaultTask(void const * argument)
 	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | TIM_CCER_CC1P;
 */
 
-	HAL_TIM_Base_Start_IT(&htim4); //Starts the sync generation
-	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)//Starts the HSYNC signal generation
+	HAL_TIM_Base_Start_IT(&htim4); //Starts the state machine generation
+	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)	//Starts the HSYNC signal generation
 	{
 		Error_Handler();	//horror
 	}
-	if (HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_2) != HAL_OK)//Starts the start of scan trigger
+	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2) != HAL_OK)	//Starts the start of scan trigger (gate)
 	{
 		Error_Handler();	//horror
 	}
-	if (HAL_TIM_OC_Start_IT(&htim4, TIM_CHANNEL_3) != HAL_OK)//Starts the end of scan interrupt
+	if (HAL_TIM_OC_Start_IT(&htim4, TIM_CHANNEL_3) != HAL_OK)	//Starts the end of scan interrupt
 	{
 		Error_Handler();	//horror
 	}
 
 //XXX
 	//HAL_TIM_Base_Start(&htim1); //Starts the pix clock generation
-	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)//Starts the pix clock signal generation
+	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)	//Starts the pix clock test signal generation
 	{
 		Error_Handler();	//horror
 	}
@@ -1382,7 +1398,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		//XXX do VGA state machine
 		volatile int i = 0;
 		(void)i;
-		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
+//		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
 	}
 	else
   /* USER CODE END Callback 0 */
