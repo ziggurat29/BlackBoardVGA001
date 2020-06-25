@@ -1052,58 +1052,81 @@ static void MX_SPI1_Init_Flash(void)
 //hooks related to video support
 
 
-//TIM4 OC2 is used to signal start of scan line
+//define line vsync first
+#define VGA_FIRST_VSYNC 1
+//define line vsync last
+#define VGA_LAST_VSYNC 5
+//define visible first
+#define VGA_FIRST_VISIBLE 28
+//define visible last (resets line counter)
+#define VGA_LAST_VISIBLE 628
+
+//line counter
+volatile unsigned int g_nThisVidLine __ccram;
+//state
+
+//scan buffer (in sram2)
+
+
+
 //TIM4 OC3 is used to signal end of scan line
-//XXX may become DMA transfer complete
+//XXX may become DMA transfer complete; probably can't since that's only on visible lines
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim)
 {
-	//currently we implicitly know this is from TIM4
-//	if (htim->Instance == TIM4) {
-
-	//if OC2; start of video
-	//XXX already cleared by caller if (__HAL_TIM_GET_FLAG(htim, TIM_FLAG_CC2) != RESET)
-	if ( HAL_TIM_ACTIVE_CHANNEL_2 == htim->Channel )
-	{
-		//XXX in trigger mode, we shouldn't have to do this stuff
-		volatile int i = 0;
-		(void)i;
-	}
+	//currently, we implicitly know this is from TIM4 OC3
 
 	//if OC3; end of video
+	//if (htim->Instance == TIM4) {
 	//XXX already cleared by caller if (__HAL_TIM_GET_FLAG(htim, TIM_FLAG_CC3) != RESET)
-	if ( HAL_TIM_ACTIVE_CHANNEL_3 == htim->Channel )
+	//if ( HAL_TIM_ACTIVE_CHANNEL_3 == htim->Channel )
 	{
-		//first, clear the OC2 since the TIM seems level-triggered
-		uint16_t saveCCMR1 = TIM4->CCMR1;
-		saveCCMR1 &= ~TIM_CCMR1_OC2M;
-		saveCCMR1 |= (TIM_OCMODE_FORCED_INACTIVE << 8U);	//'4'
+		//first, force OC2 inactive since the ITRx seems level-triggered and there is no 'auto reset' mode
+		uint32_t saveCCMR1 = TIM4->CCMR1;
+		saveCCMR1 &= ~TIM_CCMR1_OC2M_Msk;
+		saveCCMR1 |= (4 << TIM_CCMR1_OC2M_Pos);	//'TIM_OCMODE_FORCED_INACTIVE'
 		TIM4->CCMR1 = saveCCMR1;
 
-		//now turn off TIM1 so as to be ready for next trigger
-		//disable slave move; we can't stop the timer unless we do this first
-		uint16_t saveSMCR = TIM1->SMCR;
-		TIM1->SMCR = 0;
-		//TIM1->SR &= ~(TIM_SR_TIF);
+		//now that's off, turn off TIM1 to effectively re-arm for next trigger
+		uint32_t saveSMCR = TIM1->SMCR;
+		TIM1->SMCR = 0;	//disable slave mode; we can't stop the timer unless we do this first
 		TIM1->CR1 &= ~(TIM_CR1_CEN);	//stop clocking; effectively waiting for next trigger
-		//TIM1->CR1 |= ~(TIM_CR1_URS);	//update request source
 		TIM1->CNT = 0;	//in trigger mode, we must explicitly reset
 		TIM1->SMCR = saveSMCR;	//re-enable slave mode
 
 		//set back to go active when we match again, and thus trigger once more
-		saveCCMR1 &= ~TIM_CCMR1_OC2M;
-		saveCCMR1 |= (TIM_OCMODE_ACTIVE << 8U);	//'1'
+		saveCCMR1 &= ~TIM_CCMR1_OC2M_Msk;
+		saveCCMR1 |= (1 << TIM_CCMR1_OC2M_Pos);	//'TIM_OCMODE_ACTIVE'
 		TIM4->CCMR1 = saveCCMR1;
 
 
-		//XXX do VGA state machine
-		volatile int i = 0;
-		(void)i;
-//		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
-
+		//do VGA state machine
+		unsigned int nNextVidLine = g_nThisVidLine + 1;
+		if ( VGA_FIRST_VSYNC == nNextVidLine || VGA_LAST_VSYNC == nNextVidLine )
+		{
+			//we toggle for simplicity with different polarities, but note your init to ensure it starts correctly!
+			HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);
+		}
+		else if ( VGA_FIRST_VISIBLE-1 == nNextVidLine )
+		{
+			//XXX state == 'starting'
+			//XXX prep
+		}
+		else if ( VGA_FIRST_VISIBLE == nNextVidLine )
+		{
+			//XXX state = 'active'
+		}
+		else if ( VGA_LAST_VISIBLE-1 == nNextVidLine )
+		{
+			//XXX state = 'finishing'
+		}
+		else if ( VGA_LAST_VISIBLE == nNextVidLine )
+		{
+			//XXX state = 'blanking'
+			nNextVidLine = 0;
+		}
+		g_nThisVidLine = nNextVidLine;
 	}
 
-//	}
-//	else
 }
 
 
@@ -1269,6 +1292,9 @@ void StartDefaultTask(void const * argument)
 
 	//set up the video subsystem
 	Video_Initialize();
+	g_nThisVidLine = 0;	//(must explicitly init since ccram)
+	HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_RESET);	//must set because we toggle; moreover this is for positive polarity
+
 
 /*
 	//Infinite loop
@@ -1291,9 +1317,7 @@ void StartDefaultTask(void const * argument)
 	htim4.Instance->ARR = 1107;		//line time+1 = 26.38 us
 	htim4.Instance->CCR1 = 134;
 	htim4.Instance->CCR2 = 227;
-//htim4.Instance->CCR2 = 300;
 	htim4.Instance->CCR3 = 1067;
-//htim4.Instance->CCR3 = 700;
 	//set the hsync polarity as needed (positive)
 	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | 0;
 
