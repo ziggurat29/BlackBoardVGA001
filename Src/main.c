@@ -218,7 +218,11 @@ int main(void)
 	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
 	DWT->CYCCNT = 0;
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-  
+
+	//set up that the video-related timers will stop when debugging
+	__HAL_DBGMCU_FREEZE_TIM4();
+	__HAL_DBGMCU_FREEZE_TIM1();
+
 	//do a dummy alloc to cause the heap to be init'ed and so the memory stats as well
 	vPortFree ( pvPortMalloc ( 0 ) );
 
@@ -595,7 +599,7 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
-  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_GATED;
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_TRIGGER;
   sSlaveConfig.InputTrigger = TIM_TS_ITR3;
   if (HAL_TIM_SlaveConfigSynchro(&htim1, &sSlaveConfig) != HAL_OK)
   {
@@ -609,7 +613,7 @@ static void MX_TIM1_Init(void)
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 2;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
@@ -679,7 +683,7 @@ static void MX_TIM4_Init(void)
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_OC2REF;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_ENABLE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
@@ -692,13 +696,16 @@ static void MX_TIM4_Init(void)
   {
     Error_Handler();
   }
+  sConfigOC.OCMode = TIM_OCMODE_ACTIVE;
   sConfigOC.Pulse = 216;
-  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
+  if (HAL_TIM_OC_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 1016;
+  sConfigOC.OCMode = TIM_OCMODE_TOGGLE;
+  sConfigOC.Pulse = 16016;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   if (HAL_TIM_OC_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
   {
     Error_Handler();
@@ -1045,24 +1052,55 @@ static void MX_SPI1_Init_Flash(void)
 //hooks related to video support
 
 
+//TIM4 OC2 is used to signal start of scan line
 //TIM4 OC3 is used to signal end of scan line
 //XXX may become DMA transfer complete
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim)
 {
-	//currently we know this is from TIM4 OC3
+	//currently we implicitly know this is from TIM4
 //	if (htim->Instance == TIM4) {
+
+	//if OC2; start of video
+	//XXX already cleared by caller if (__HAL_TIM_GET_FLAG(htim, TIM_FLAG_CC2) != RESET)
+	if ( HAL_TIM_ACTIVE_CHANNEL_2 == htim->Channel )
+	{
+		//XXX in trigger mode, we shouldn't have to do this stuff
+		volatile int i = 0;
+		(void)i;
+	}
+
+	//if OC3; end of video
+	//XXX already cleared by caller if (__HAL_TIM_GET_FLAG(htim, TIM_FLAG_CC3) != RESET)
+	if ( HAL_TIM_ACTIVE_CHANNEL_3 == htim->Channel )
+	{
+		//first, clear the OC2 since the TIM seems level-triggered
+		uint16_t saveCCMR1 = TIM4->CCMR1;
+		saveCCMR1 &= ~TIM_CCMR1_OC2M;
+		saveCCMR1 |= (TIM_OCMODE_FORCED_INACTIVE << 8U);	//'4'
+		TIM4->CCMR1 = saveCCMR1;
+
+		//now turn off TIM1 so as to be ready for next trigger
+		//disable slave move; we can't stop the timer unless we do this first
+		uint16_t saveSMCR = TIM1->SMCR;
+		TIM1->SMCR = 0;
+		//TIM1->SR &= ~(TIM_SR_TIF);
+		TIM1->CR1 &= ~(TIM_CR1_CEN);	//stop clocking; effectively waiting for next trigger
+		//TIM1->CR1 |= ~(TIM_CR1_URS);	//update request source
+		TIM1->CNT = 0;	//in trigger mode, we must explicitly reset
+		TIM1->SMCR = saveSMCR;	//re-enable slave mode
+
+		//set back to go active when we match again, and thus trigger once more
+		saveCCMR1 &= ~TIM_CCMR1_OC2M;
+		saveCCMR1 |= (TIM_OCMODE_ACTIVE << 8U);	//'1'
+		TIM4->CCMR1 = saveCCMR1;
+
+
 		//XXX do VGA state machine
 		volatile int i = 0;
 		(void)i;
 //		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
 
-		htim1.Instance->CNT = 0;	//reset to be ready for next gating
-//		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-//		if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)	//Starts the pix clock test signal generation
-//		{
-//			Error_Handler();	//horror
-//		}
-
+	}
 
 //	}
 //	else
@@ -1253,7 +1291,9 @@ void StartDefaultTask(void const * argument)
 	htim4.Instance->ARR = 1107;		//line time+1 = 26.38 us
 	htim4.Instance->CCR1 = 134;
 	htim4.Instance->CCR2 = 227;
+//htim4.Instance->CCR2 = 300;
 	htim4.Instance->CCR3 = 1067;
+//htim4.Instance->CCR3 = 700;
 	//set the hsync polarity as needed (positive)
 	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | 0;
 
@@ -1268,12 +1308,12 @@ void StartDefaultTask(void const * argument)
 	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | TIM_CCER_CC1P;
 */
 
-	HAL_TIM_Base_Start_IT(&htim4); //Starts the state machine generation
+	HAL_TIM_Base_Start(&htim4); //Starts the state machine generation
 	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)	//Starts the HSYNC signal generation
 	{
 		Error_Handler();	//horror
 	}
-	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2) != HAL_OK)	//Starts the start of scan trigger (gate)
+	if (HAL_TIM_OC_Start(&htim4, TIM_CHANNEL_2) != HAL_OK)	//Starts the start of scan trigger
 	{
 		Error_Handler();	//horror
 	}
@@ -1288,7 +1328,6 @@ void StartDefaultTask(void const * argument)
 	{
 		Error_Handler();	//horror
 	}
-
 
 	//light some lamps on a countdown
 	LightLamp ( 1000, &g_lltD2, _ledOnD2 );
@@ -1395,10 +1434,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
 	if (htim->Instance == TIM4) {
-		//XXX do VGA state machine
 		volatile int i = 0;
 		(void)i;
-//		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);	//testing; see the interrupt
+		//XXX probably not going to do this way anymore
 	}
 	else
   /* USER CODE END Callback 0 */
