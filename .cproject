@@ -58,7 +58,7 @@
 									<listOptionValue builtIn="false" value="STM32F407xx" />
 									<listOptionValue builtIn="false" value="HAVE_USBCDC=1" />
 									<listOptionValue builtIn="false" value="HAVE_UART1=1" />
-								</option>
+								<listOptionValue builtIn="false" value="USE_FULL_LL_DRIVER" /></option>
 								<option id="fr.ac6.managedbuild.gnu.c.compiler.option.misc.other.1635199532" superClass="fr.ac6.managedbuild.gnu.c.compiler.option.misc.other" useByScannerDiscovery="false" value="-fmessage-length=0" valueType="string" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.c.1123911031" superClass="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.c" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.s.51538458" superClass="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.s" />
@@ -82,7 +82,7 @@
 								<option id="gnu.cpp.compiler.option.preprocessor.def.2095527826" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="USE_HAL_DRIVER" />
 									<listOptionValue builtIn="false" value="STM32F407xx" />
-								</option>
+								<listOptionValue builtIn="false" value="USE_FULL_LL_DRIVER" /></option>
 								<option id="fr.ac6.managedbuild.gnu.cpp.compiler.option.misc.other.1452621658" name="Other flags" superClass="fr.ac6.managedbuild.gnu.cpp.compiler.option.misc.other" useByScannerDiscovery="false" value="-fmessage-length=0" valueType="string" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.cpp.1110701445" superClass="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.cpp" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.s.1578794" superClass="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.s" />
@@ -184,7 +184,7 @@
 									<listOptionValue builtIn="false" value="STM32F407xx" />
 									<listOptionValue builtIn="false" value="HAVE_USBCDC=1" />
 									<listOptionValue builtIn="false" value="HAVE_UART1=1" />
-								</option>
+								<listOptionValue builtIn="false" value="USE_FULL_LL_DRIVER" /></option>
 								<option id="fr.ac6.managedbuild.gnu.c.compiler.option.misc.other.1635199532" superClass="fr.ac6.managedbuild.gnu.c.compiler.option.misc.other" useByScannerDiscovery="false" value="-fmessage-length=0" valueType="string" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.c.1123911031" superClass="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.c" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.s.51538458" superClass="fr.ac6.managedbuild.tool.gnu.cross.c.compiler.input.s" />
@@ -208,7 +208,7 @@
 								<option id="gnu.cpp.compiler.option.preprocessor.def.symbols.72871392" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="USE_HAL_DRIVER" />
 									<listOptionValue builtIn="false" value="STM32F407xx" />
-								</option>
+								<listOptionValue builtIn="false" value="USE_FULL_LL_DRIVER" /></option>
 								<option id="fr.ac6.managedbuild.gnu.cpp.compiler.option.misc.other.1452621658" name="Other flags" superClass="fr.ac6.managedbuild.gnu.cpp.compiler.option.misc.other" useByScannerDiscovery="false" value="-fmessage-length=0" valueType="string" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.cpp.1110701445" superClass="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.cpp" />
 								<inputType id="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.s.1578794" superClass="fr.ac6.managedbuild.tool.gnu.cross.cpp.compiler.input.s" />

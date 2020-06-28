@@ -29,6 +29,20 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
+#include "stm32f4xx_ll_dac.h"
+#include "stm32f4xx_ll_dma.h"
+#include "stm32f4xx_ll_rcc.h"
+#include "stm32f4xx_ll_bus.h"
+#include "stm32f4xx_ll_system.h"
+#include "stm32f4xx_ll_exti.h"
+#include "stm32f4xx_ll_cortex.h"
+#include "stm32f4xx_ll_utils.h"
+#include "stm32f4xx_ll_pwr.h"
+#include "stm32f4xx_hal.h"
+#include "stm32f4xx_ll_spi.h"
+#include "stm32f4xx_ll_tim.h"
+#include "stm32f4xx.h"
+#include "stm32f4xx_ll_gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -50,8 +64,6 @@ extern "C" {
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -60,50 +72,50 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define KEY1_Pin GPIO_PIN_3
+#define KEY1_Pin LL_GPIO_PIN_3
 #define KEY1_GPIO_Port GPIOE
 #define KEY1_EXTI_IRQn EXTI3_IRQn
-#define KEY0_Pin GPIO_PIN_4
+#define KEY0_Pin LL_GPIO_PIN_4
 #define KEY0_GPIO_Port GPIOE
 #define KEY0_EXTI_IRQn EXTI4_IRQn
-#define BOGO_CARDDETECT_Pin GPIO_PIN_13
+#define BOGO_CARDDETECT_Pin LL_GPIO_PIN_13
 #define BOGO_CARDDETECT_GPIO_Port GPIOC
-#define LED_D2_Pin GPIO_PIN_6
+#define LED_D2_Pin LL_GPIO_PIN_6
 #define LED_D2_GPIO_Port GPIOA
-#define LED_D3_Pin GPIO_PIN_7
+#define LED_D3_Pin LL_GPIO_PIN_7
 #define LED_D3_GPIO_Port GPIOA
-#define FLASH_CS_Pin GPIO_PIN_0
+#define FLASH_CS_Pin LL_GPIO_PIN_0
 #define FLASH_CS_GPIO_Port GPIOB
-#define R0_Pin GPIO_PIN_8
+#define R0_Pin LL_GPIO_PIN_8
 #define R0_GPIO_Port GPIOE
-#define R1_Pin GPIO_PIN_9
+#define R1_Pin LL_GPIO_PIN_9
 #define R1_GPIO_Port GPIOE
-#define R2_Pin GPIO_PIN_10
+#define R2_Pin LL_GPIO_PIN_10
 #define R2_GPIO_Port GPIOE
-#define G0_Pin GPIO_PIN_11
+#define G0_Pin LL_GPIO_PIN_11
 #define G0_GPIO_Port GPIOE
-#define G1_Pin GPIO_PIN_12
+#define G1_Pin LL_GPIO_PIN_12
 #define G1_GPIO_Port GPIOE
-#define G2_Pin GPIO_PIN_13
+#define G2_Pin LL_GPIO_PIN_13
 #define G2_GPIO_Port GPIOE
-#define B0_Pin GPIO_PIN_14
+#define B0_Pin LL_GPIO_PIN_14
 #define B0_GPIO_Port GPIOE
-#define B1_Pin GPIO_PIN_15
+#define B1_Pin LL_GPIO_PIN_15
 #define B1_GPIO_Port GPIOE
-#define PS2_CK_Pin GPIO_PIN_6
+#define PS2_CK_Pin LL_GPIO_PIN_6
 #define PS2_CK_GPIO_Port GPIOC
 #define PS2_CK_EXTI_IRQn EXTI9_5_IRQn
-#define PS2_DATA_Pin GPIO_PIN_7
+#define PS2_DATA_Pin LL_GPIO_PIN_7
 #define PS2_DATA_GPIO_Port GPIOC
-#define FLASH_SCK_Pin GPIO_PIN_3
+#define FLASH_SCK_Pin LL_GPIO_PIN_3
 #define FLASH_SCK_GPIO_Port GPIOB
-#define FLASH_MISO_Pin GPIO_PIN_4
+#define FLASH_MISO_Pin LL_GPIO_PIN_4
 #define FLASH_MISO_GPIO_Port GPIOB
-#define FLASH_MOSI_Pin GPIO_PIN_5
+#define FLASH_MOSI_Pin LL_GPIO_PIN_5
 #define FLASH_MOSI_GPIO_Port GPIOB
-#define HSYNC_Pin GPIO_PIN_6
+#define HSYNC_Pin LL_GPIO_PIN_6
 #define HSYNC_GPIO_Port GPIOB
-#define VSYNC_Pin GPIO_PIN_7
+#define VSYNC_Pin LL_GPIO_PIN_7
 #define VSYNC_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 

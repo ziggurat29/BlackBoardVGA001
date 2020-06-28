@@ -50,6 +50,13 @@
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
 
+extern void TIM4OC3_ISR(void);
+
+extern void DMA2S5_XferCpl_ISR (void);
+extern void DMA2S5_HalfCpl_ISR (void);
+extern void DMA2S5_Error_ISR (void);
+extern void DMA2S5_Abort_ISR (void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -59,15 +66,9 @@
 
 /* External variables --------------------------------------------------------*/
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
-extern DMA_HandleTypeDef hdma_dac1;
-extern DMA_HandleTypeDef hdma_dac2;
-extern DAC_HandleTypeDef hdac;
 extern DMA_HandleTypeDef hdma_sdio_rx;
 extern DMA_HandleTypeDef hdma_sdio_tx;
 extern SD_HandleTypeDef hsd;
-extern SPI_HandleTypeDef hspi1;
-extern DMA_HandleTypeDef hdma_tim1_up;
-extern TIM_HandleTypeDef htim4;
 extern UART_HandleTypeDef huart1;
 extern TIM_HandleTypeDef htim12;
 
@@ -193,7 +194,13 @@ void EXTI3_IRQHandler(void)
   /* USER CODE BEGIN EXTI3_IRQn 0 */
 
   /* USER CODE END EXTI3_IRQn 0 */
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_3);
+  if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_3) != RESET)
+  {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_3);
+    /* USER CODE BEGIN LL_EXTI_LINE_3 */
+    
+    /* USER CODE END LL_EXTI_LINE_3 */
+  }
   /* USER CODE BEGIN EXTI3_IRQn 1 */
 
   /* USER CODE END EXTI3_IRQn 1 */
@@ -207,7 +214,13 @@ void EXTI4_IRQHandler(void)
   /* USER CODE BEGIN EXTI4_IRQn 0 */
 
   /* USER CODE END EXTI4_IRQn 0 */
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_4);
+  if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_4) != RESET)
+  {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_4);
+    /* USER CODE BEGIN LL_EXTI_LINE_4 */
+    
+    /* USER CODE END LL_EXTI_LINE_4 */
+  }
   /* USER CODE BEGIN EXTI4_IRQn 1 */
 
   /* USER CODE END EXTI4_IRQn 1 */
@@ -221,7 +234,7 @@ void DMA1_Stream5_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Stream5_IRQn 0 */
 
   /* USER CODE END DMA1_Stream5_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_dac1);
+  
   /* USER CODE BEGIN DMA1_Stream5_IRQn 1 */
 
   /* USER CODE END DMA1_Stream5_IRQn 1 */
@@ -235,7 +248,7 @@ void DMA1_Stream6_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Stream6_IRQn 0 */
 
   /* USER CODE END DMA1_Stream6_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_dac2);
+  
   /* USER CODE BEGIN DMA1_Stream6_IRQn 1 */
 
   /* USER CODE END DMA1_Stream6_IRQn 1 */
@@ -249,7 +262,13 @@ void EXTI9_5_IRQHandler(void)
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
 
   /* USER CODE END EXTI9_5_IRQn 0 */
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_6);
+  if (LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_6) != RESET)
+  {
+    LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_6);
+    /* USER CODE BEGIN LL_EXTI_LINE_6 */
+    
+    /* USER CODE END LL_EXTI_LINE_6 */
+  }
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
 
   /* USER CODE END EXTI9_5_IRQn 1 */
@@ -261,9 +280,26 @@ void EXTI9_5_IRQHandler(void)
 void TIM4_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM4_IRQn 0 */
+	//
+	//CC3 is used for horz front porch activities
+	if ( TIM4->SR & TIM_SR_CC3IF )	//if CC3 has gone off
+	{
+		if ( TIM4->DIER & TIM_DIER_CC3IE )	//if the CC3 interrupt is enabled
+		{
+			TIM4->SR = ~TIM_DIER_CC3IE;	//clear the interrupt pending bit
+			//if Input capture event
+			//if ((TIM4->CCMR2 & TIM_CCMR2_CC3S) != 0x00U)
+			//{
+			//}
+			//if Output compare event
+			//else
+			{
+				TIM4OC3_ISR();
+			}
+		}
+	}
 
   /* USER CODE END TIM4_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim4);
   /* USER CODE BEGIN TIM4_IRQn 1 */
 
   /* USER CODE END TIM4_IRQn 1 */
@@ -277,7 +313,6 @@ void SPI1_IRQHandler(void)
   /* USER CODE BEGIN SPI1_IRQn 0 */
 
   /* USER CODE END SPI1_IRQn 0 */
-  HAL_SPI_IRQHandler(&hspi1);
   /* USER CODE BEGIN SPI1_IRQn 1 */
 
   /* USER CODE END SPI1_IRQn 1 */
@@ -333,7 +368,7 @@ void TIM6_DAC_IRQHandler(void)
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
 
   /* USER CODE END TIM6_DAC_IRQn 0 */
-  HAL_DAC_IRQHandler(&hdac);
+  
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
 
   /* USER CODE END TIM6_DAC_IRQn 1 */
@@ -374,8 +409,29 @@ void DMA2_Stream5_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream5_IRQn 0 */
 
+/*
+LL_DMA_IsActiveFlag_HT5(DMA_TypeDef *DMAx)
+LL_DMA_ClearFlag_HT5(DMA_TypeDef *DMAx)
+extern void DMA2S5_HalfCpl_ISR (void);
+
+LL_DMA_IsActiveFlag_TC5(DMA_TypeDef *DMAx)
+LL_DMA_ClearFlag_TC5(DMA_TypeDef *DMAx)
+extern void DMA2S5_XferCpl_ISR (void);
+
+LL_DMA_IsActiveFlag_TE5(DMA_TypeDef *DMAx)
+LL_DMA_ClearFlag_TE5(DMA_TypeDef *DMAx)
+
+LL_DMA_IsActiveFlag_DME5(DMA_TypeDef *DMAx)
+LL_DMA_ClearFlag_DME5(DMA_TypeDef *DMAx)
+
+LL_DMA_IsActiveFlag_FE5(DMA_TypeDef *DMAx)
+LL_DMA_ClearFlag_FE5(DMA_TypeDef *DMAx)
+extern void DMA2S5_Error_ISR (void);
+extern void DMA2S5_Abort_ISR (void);
+*/
+
   /* USER CODE END DMA2_Stream5_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_tim1_up);
+  
   /* USER CODE BEGIN DMA2_Stream5_IRQn 1 */
 
   /* USER CODE END DMA2_Stream5_IRQn 1 */
