@@ -4,7 +4,6 @@
 
 #include "lamps.h"
 #include "main.h"
-#include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
 
 #include "task_notification_bits.h"
@@ -22,13 +21,13 @@ extern osThreadId defaultTaskHandle;	//in main.c
 //'on' status for each lamp
 
 //various lights
-void _ledOnD2 ( void ) { HAL_GPIO_WritePin(LED_D2_GPIO_Port, LED_D2_Pin, GPIO_PIN_RESET); }
-void _ledOffD2 ( void ) { HAL_GPIO_WritePin(LED_D2_GPIO_Port, LED_D2_Pin, GPIO_PIN_SET); }
-void _ledToggleD2 ( void ) { HAL_GPIO_TogglePin (LED_D2_GPIO_Port, LED_D2_Pin); }
+void _ledOnD2 ( void ) { LL_GPIO_ResetOutputPin(LED_D2_GPIO_Port, LED_D2_Pin); }
+void _ledOffD2 ( void ) { LL_GPIO_SetOutputPin(LED_D2_GPIO_Port, LED_D2_Pin); }
+void _ledToggleD2 ( void ) { LL_GPIO_TogglePin (LED_D2_GPIO_Port, LED_D2_Pin); }
 
-void _ledOnD3 ( void ) { HAL_GPIO_WritePin(LED_D3_GPIO_Port, LED_D3_Pin, GPIO_PIN_RESET); }
-void _ledOffD3 ( void ) { HAL_GPIO_WritePin(LED_D3_GPIO_Port, LED_D3_Pin, GPIO_PIN_SET); }
-void _ledToggleD3 ( void ) { HAL_GPIO_TogglePin (LED_D3_GPIO_Port, LED_D3_Pin); }
+void _ledOnD3 ( void ) { LL_GPIO_ResetOutputPin(LED_D3_GPIO_Port, LED_D3_Pin); }
+void _ledOffD3 ( void ) { LL_GPIO_SetOutputPin(LED_D3_GPIO_Port, LED_D3_Pin); }
+void _ledToggleD3 ( void ) { LL_GPIO_TogglePin (LED_D3_GPIO_Port, LED_D3_Pin); }
 
 
 //diagnostic LED start times and durations

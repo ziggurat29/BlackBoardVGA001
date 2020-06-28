@@ -102,6 +102,7 @@ void _test_patternScanBuffer ( void )
 
 
 //TIM4 OC3 is used to signal end of scan line
+//this is run at the highest priority, and may /not/ call FreeRTOS functions
 void TIM4OC3_ISR(void)
 {
 	if ( g_eVgaState & 0x02)	//arm for video out?
@@ -152,7 +153,7 @@ void TIM4OC3_ISR(void)
 	if ( VGA_FIRST_VSYNC == nNextVidLine || VGA_LAST_VSYNC == nNextVidLine )
 	{
 		//we toggle for simplicity with different polarities, but note your init to ensure it starts correctly!
-		HAL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);
+		LL_GPIO_TogglePin(VSYNC_GPIO_Port, VSYNC_Pin);
 	}
 	else if ( VGA_FIRST_VISIBLE-1 == nNextVidLine )
 	{
@@ -205,8 +206,8 @@ void Video_Initialize ( void )
 {
 	g_nThisVidLine = 0;	//(must explicitly init since ccram)
 	g_eVgaState = VGA_BLANK;	//(must explicitly init since ccram)
-	HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_RESET);	//must set because we toggle; moreover this is for positive polarity
-	
+	LL_GPIO_ResetOutputPin(VSYNC_GPIO_Port,VSYNC_Pin);	//must set because we toggle; moreover this is for positive polarity
+
 	_test_patternScanBuffer();	//hack for initial testing
 
 	//this must be done to get the PWM output started

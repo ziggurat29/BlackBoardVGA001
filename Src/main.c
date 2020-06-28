@@ -728,7 +728,7 @@ static void MX_TIM4_Init(void)
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM4);
 
   /* TIM4 interrupt Init */
-  NVIC_SetPriority(TIM4_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),5, 0));
+  NVIC_SetPriority(TIM4_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
   NVIC_EnableIRQ(TIM4_IRQn);
 
   /* USER CODE BEGIN TIM4_Init 1 */
@@ -763,6 +763,7 @@ static void MX_TIM4_Init(void)
   LL_TIM_OC_DisableFast(TIM4, LL_TIM_CHANNEL_CH3);
   LL_TIM_SetTriggerOutput(TIM4, LL_TIM_TRGO_OC2REF);
   LL_TIM_DisableMasterSlaveMode(TIM4);
+  LL_TIM_OC_DisablePreload(TIM4, LL_TIM_CHANNEL_CH1);
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
@@ -1090,24 +1091,21 @@ void vApplicationMallocFailedHook(void)
 //EXTI support
 
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+
+void EXTI_3_ISR ( void )
 {
-/*
-	switch ( GPIO_Pin )
-	{
-		case KEY0_Pin:
-		break;
-		case KEY1_Pin:
-		break;
-		case PS2_CK_Pin:
-		break;
-		default:
-			//XXX que?
-		break;
-	}
-*/
+	//KEY1
 }
 
+void EXTI_4_ISR ( void )
+{
+	//KEY0
+}
+
+void EXTI_6_ISR ( void )
+{
+	//PS2_CK
+}
 
 
 

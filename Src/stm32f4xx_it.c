@@ -57,6 +57,10 @@ extern void DMA2S5_HalfCpl_ISR (void);
 extern void DMA2S5_Error_ISR (void);
 extern void DMA2S5_Abort_ISR (void);
 
+void EXTI_3_ISR ( void );
+void EXTI_4_ISR ( void );
+void EXTI_6_ISR ( void );
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -198,7 +202,7 @@ void EXTI3_IRQHandler(void)
   {
     LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_3);
     /* USER CODE BEGIN LL_EXTI_LINE_3 */
-    
+	EXTI_3_ISR();
     /* USER CODE END LL_EXTI_LINE_3 */
   }
   /* USER CODE BEGIN EXTI3_IRQn 1 */
@@ -218,7 +222,7 @@ void EXTI4_IRQHandler(void)
   {
     LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_4);
     /* USER CODE BEGIN LL_EXTI_LINE_4 */
-    
+	EXTI_4_ISR();
     /* USER CODE END LL_EXTI_LINE_4 */
   }
   /* USER CODE BEGIN EXTI4_IRQn 1 */
@@ -266,7 +270,7 @@ void EXTI9_5_IRQHandler(void)
   {
     LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_6);
     /* USER CODE BEGIN LL_EXTI_LINE_6 */
-    
+	EXTI_6_ISR();
     /* USER CODE END LL_EXTI_LINE_6 */
   }
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
