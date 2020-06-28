@@ -1064,9 +1064,42 @@ static void MX_SPI1_Init_Flash(void)
 //line counter
 volatile unsigned int g_nThisVidLine __ccram;
 //state
+typedef enum VgaState
+{
+	VGA_BLANK = 0x00,		//no vid, no prep scan
+	VGA_SETUP = 0x01,		//no vid, prep scan
+	VGA_ACTIVE = 0x03,		//vid, prep scan
+	VGA_STOPPING = 0x02,	//vid, no prep scan
+} VgaState;
+VgaState g_eVgaState __ccram;
 
-//scan buffer (in sram2)
 
+//scan buffer (in sram2); round up line length to word, and add a word that we will clear
+//#define VGA_SCAN_LINE_WORDS ((800+sizeof(uint32_t)-1)/sizeof(uint32_t))
+#define VGA_SCAN_LINE_WORDS ((600+sizeof(uint32_t)-1)/sizeof(uint32_t))
+uint32_t g_abyScan[VGA_SCAN_LINE_WORDS+1] __ram2;
+
+//XXX hack for testing
+void _test_patternScanBuffer ( void )
+{
+	//  15 14 13 12  11 10  9  8
+	//  b1 b0 g2 g1  g0 r2 r1 r0
+	g_abyScan[0] = 0x00ff00ff;	//first visible word
+
+	//middle visible words
+	for ( size_t nIdx = 1; nIdx < VGA_SCAN_LINE_WORDS-1; ++nIdx )
+	{
+		g_abyScan[nIdx] = 0x00000000;
+	}
+
+	g_abyScan[VGA_SCAN_LINE_WORDS-1] = 0xff00ff00;	//last visible word
+
+	g_abyScan[VGA_SCAN_LINE_WORDS] = 0x00000000;	//final word always black
+}
+
+//(this will not fit, of course)
+//frame buffer has a word one the left and right to make some drawing routines easier by avoiding clipping logic
+//uint32_t g_abyFB[1+(VGA_SCAN_LINE_LENGTH+1)+1][600];
 
 
 //TIM4 OC3 is used to signal end of scan line
@@ -1080,24 +1113,43 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim)
 	//XXX already cleared by caller if (__HAL_TIM_GET_FLAG(htim, TIM_FLAG_CC3) != RESET)
 	//if ( HAL_TIM_ACTIVE_CHANNEL_3 == htim->Channel )
 	{
-		//first, force OC2 inactive since the ITRx seems level-triggered and there is no 'auto reset' mode
-		uint32_t saveCCMR1 = TIM4->CCMR1;
-		saveCCMR1 &= ~TIM_CCMR1_OC2M_Msk;
-		saveCCMR1 |= (4 << TIM_CCMR1_OC2M_Pos);	//'TIM_OCMODE_FORCED_INACTIVE'
-		TIM4->CCMR1 = saveCCMR1;
+		if ( g_eVgaState & 0x02)	//arm for video out?
+		{
+			//first, force OC2 inactive since the ITRx seems level-triggered and there is no 'auto reset' mode
+			uint32_t saveCCMR1 = TIM4->CCMR1;
+			saveCCMR1 &= ~TIM_CCMR1_OC2M_Msk;
+			saveCCMR1 |= (4 << TIM_CCMR1_OC2M_Pos);	//'TIM_OCMODE_FORCED_INACTIVE'
+			TIM4->CCMR1 = saveCCMR1;
 
-		//now that's off, turn off TIM1 to effectively re-arm for next trigger
-		uint32_t saveSMCR = TIM1->SMCR;
-		TIM1->SMCR = 0;	//disable slave mode; we can't stop the timer unless we do this first
-		TIM1->CR1 &= ~(TIM_CR1_CEN);	//stop clocking; effectively waiting for next trigger
-		TIM1->CNT = 0;	//in trigger mode, we must explicitly reset
-		TIM1->SMCR = saveSMCR;	//re-enable slave mode
+			//now that's off, turn off TIM1 to effectively re-arm for next trigger
+			uint32_t saveSMCR = TIM1->SMCR;
+			TIM1->SMCR = 0;	//disable slave mode; we can't stop the timer unless we do this first
+			TIM1->CR1 &= ~(TIM_CR1_CEN);	//stop clocking; effectively waiting for next trigger
+			TIM1->CNT = 0;	//in trigger mode, we must explicitly reset
+			TIM1->SMCR = saveSMCR;	//re-enable slave mode
 
-		//set back to go active when we match again, and thus trigger once more
-		saveCCMR1 &= ~TIM_CCMR1_OC2M_Msk;
-		saveCCMR1 |= (1 << TIM_CCMR1_OC2M_Pos);	//'TIM_OCMODE_ACTIVE'
-		TIM4->CCMR1 = saveCCMR1;
+			//This dorky sequence causes any pending DRQ's to be removed prior
+			//setting up for another transfer.  Otherwise we'd get one transfer
+			//immediately, rather than waiting for the trigger event later.
+			__HAL_TIM_DISABLE_DMA ( &htim1, TIM_DMA_UPDATE );
+			__HAL_TIM_ENABLE_DMA ( &htim1, TIM_DMA_UPDATE );
 
+			//set back to go active when we match again, and thus trigger once more
+			saveCCMR1 &= ~TIM_CCMR1_OC2M_Msk;
+			saveCCMR1 |= (1 << TIM_CCMR1_OC2M_Pos);	//'TIM_OCMODE_ACTIVE'
+			TIM4->CCMR1 = saveCCMR1;
+
+			//start the DMA (eventually, when TIM1 gets triggered to start)
+			HAL_DMA_Start_IT(&hdma_tim1_up, 
+					(uint32_t)&g_abyScan[0], 
+					(uint32_t)0x40021015, 	//port E, high byte
+					sizeof(g_abyScan));
+		}
+
+		if ( g_eVgaState & 0x01)	//signal to prep subsequent scan line?
+		{
+//XXX
+		}
 
 		//do VGA state machine
 		unsigned int nNextVidLine = g_nThisVidLine + 1;
@@ -1108,25 +1160,78 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim)
 		}
 		else if ( VGA_FIRST_VISIBLE-1 == nNextVidLine )
 		{
-			//XXX state == 'starting'
-			//XXX prep
+			g_eVgaState = VGA_SETUP;	//xition
+//XXX prep
 		}
 		else if ( VGA_FIRST_VISIBLE == nNextVidLine )
 		{
-			//XXX state = 'active'
+			g_eVgaState = VGA_ACTIVE;	//xition
 		}
 		else if ( VGA_LAST_VISIBLE-1 == nNextVidLine )
 		{
-			//XXX state = 'finishing'
+			g_eVgaState = VGA_STOPPING;	//xition
 		}
 		else if ( VGA_LAST_VISIBLE == nNextVidLine )
 		{
-			//XXX state = 'blanking'
+			g_eVgaState = VGA_BLANK;	//xition
 			nNextVidLine = 0;
+
+			//turn off the output compare and pix clock
+
+			//first, force OC2 inactive since the ITRx seems level-triggered and there is no 'auto reset' mode
+			uint32_t saveCCMR1 = TIM4->CCMR1;
+			saveCCMR1 &= ~TIM_CCMR1_OC2M_Msk;
+			saveCCMR1 |= (4 << TIM_CCMR1_OC2M_Pos);	//'TIM_OCMODE_FORCED_INACTIVE'
+			TIM4->CCMR1 = saveCCMR1;
+
+			//now that's off, turn off TIM1 to effectively re-arm for next trigger
+			uint32_t saveSMCR = TIM1->SMCR;
+			TIM1->SMCR = 0;	//disable slave mode; we can't stop the timer unless we do this first
+			TIM1->CR1 &= ~(TIM_CR1_CEN);	//stop clocking; effectively waiting for next trigger
+			TIM1->CNT = 0;	//in trigger mode, we must explicitly reset
+			TIM1->SMCR = saveSMCR;	//re-enable slave mode
+
+			__HAL_TIM_DISABLE_DMA ( &htim1, TIM_DMA_UPDATE );
 		}
 		g_nThisVidLine = nNextVidLine;
 	}
 
+}
+
+
+
+//====================================================
+//DMA support
+//	The DMA2 channel 5 is attached to the TIM1 'update' (i.e. rollover) action,
+//and we use that to clock out our pixels.  The DMA will directly fetch byte
+//pixels from memory and push them into the PORTE high byte.
+
+//XXX I don't think I'm going to wind up using these, but they are handy for tests
+
+
+void HAL_DMA_CB_XferCpl(DMA_HandleTypeDef* hdma)
+{
+	volatile int i = 0;
+	(void)i;
+	_ledToggleD2();
+}
+
+void HAL_DMA_CB_HalfCpl(DMA_HandleTypeDef* hdma)
+{
+	volatile int i = 0;
+	(void)i;
+}
+
+void HAL_DMA_CB_Error(DMA_HandleTypeDef* hdma)
+{
+	volatile int i = 0;
+	(void)i;
+}
+
+void HAL_DMA_CB_Abort(DMA_HandleTypeDef* hdma)
+{
+	volatile int i = 0;
+	(void)i;
 }
 
 
@@ -1293,7 +1398,10 @@ void StartDefaultTask(void const * argument)
 	//set up the video subsystem
 	Video_Initialize();
 	g_nThisVidLine = 0;	//(must explicitly init since ccram)
+	g_eVgaState = VGA_BLANK;	//(must explicitly init since ccram)
 	HAL_GPIO_WritePin(VSYNC_GPIO_Port, VSYNC_Pin, GPIO_PIN_RESET);	//must set because we toggle; moreover this is for positive polarity
+	
+	_test_patternScanBuffer();	//hack for initial testing
 
 
 /*
@@ -1332,6 +1440,7 @@ void StartDefaultTask(void const * argument)
 	htim4.Instance->CCER = ( htim4.Instance->CCER & ~TIM_CCER_CC1P ) | TIM_CCER_CC1P;
 */
 
+	//XXX start the line timing scheme
 	HAL_TIM_Base_Start(&htim4); //Starts the state machine generation
 	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)	//Starts the HSYNC signal generation
 	{
@@ -1346,12 +1455,20 @@ void StartDefaultTask(void const * argument)
 		Error_Handler();	//horror
 	}
 
-//XXX
+	//XXX start the pixel timing scheme
 	//HAL_TIM_Base_Start(&htim1); //Starts the pix clock generation
 	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)	//Starts the pix clock test signal generation
 	{
 		Error_Handler();	//horror
 	}
+
+	//register DMA callbacks
+	//XXX probably not going to use; but they are handy now for testing
+	HAL_DMA_RegisterCallback(&hdma_tim1_up, HAL_DMA_XFER_CPLT_CB_ID, HAL_DMA_CB_XferCpl);
+	HAL_DMA_RegisterCallback(&hdma_tim1_up, HAL_DMA_XFER_HALFCPLT_CB_ID, HAL_DMA_CB_HalfCpl);
+	HAL_DMA_RegisterCallback(&hdma_tim1_up, HAL_DMA_XFER_ERROR_CB_ID, HAL_DMA_CB_Error);
+	HAL_DMA_RegisterCallback(&hdma_tim1_up, HAL_DMA_XFER_ABORT_CB_ID, HAL_DMA_CB_Abort);
+
 
 	//light some lamps on a countdown
 	LightLamp ( 1000, &g_lltD2, _ledOnD2 );
