@@ -185,6 +185,13 @@ void StartDefaultTask(void const * argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+//hack:  the CubeMX generated LL code for SystemClock_Config /always/ resets
+//the backup domain, thereby clearing the RTC amongst other things.  It is not
+//easy to fix because there are no USER tags therein, we we neutralize those
+//APIs altogether.
+#define LL_RCC_ForceBackupDomainReset(a)do{}while(0)
+#define LL_RCC_ReleaseBackupDomainReset(a)do{}while(0)
+
 /* USER CODE END 0 */
 
 /**
@@ -242,13 +249,24 @@ int main(void)
   /* USER CODE BEGIN SysInit */
 
 	//turn on the low power regulator so the backup sram will indeed be battery backed
-	HAL_PWR_EnableBkUpAccess();	//ensure access to the backup domain, if not already
-	__HAL_RCC_PWR_CLK_ENABLE();	//ensure the power clock is on, if not already
-	HAL_PWREx_EnableBkUpReg();	//turn on the backup regulator and wait for stabilization
+	LL_PWR_EnableBkUpAccess();	//ensure access to the backup domain, if not already
+
+	{	//ensure the power clock is on, if not already
+	SET_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);
+	volatile uint32_t n = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);	//Delay after an RCC peripheral clock enabling
+	(void)n;
+	}
+
+	LL_PWR_EnableBkUpRegulator();	//turn on the backup regulator...
+	while ( !LL_PWR_IsActiveFlag_BRR() ) {}	//... and wait for stabilization XXX timeout?
 	//leave access to the backup domain active so we can freely fiddle with rtc, etc
 
-	//enable the backup sram clock, and just leave it running so we can access freely
-	__HAL_RCC_BKPSRAM_CLK_ENABLE();	//enable the backup sram clock
+	{	//enable the backup sram clock, and just leave it running so we can access freely
+	SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_BKPSRAMEN);
+	volatile uint32_t n = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_BKPSRAMEN);	//Delay after an RCC peripheral clock enabling
+	(void)n;
+	}
+
 
   /* USER CODE END SysInit */
 
@@ -481,6 +499,38 @@ static void MX_RTC_Init(void)
 
   /* USER CODE BEGIN RTC_Init 1 */
 
+	//The generated code uses a backup register to determine if the clock has
+	//ever been set, but we don't really need to do that since we have a flag
+	//on this chip for that purpose.
+
+	//is it really necessary to do this each time?
+	RTC_InitStruct.HourFormat = LL_RTC_HOURFORMAT_24HOUR;
+	RTC_InitStruct.AsynchPrescaler = 127;
+	RTC_InitStruct.SynchPrescaler = 255;
+	LL_RTC_Init(RTC, &RTC_InitStruct);
+	LL_RTC_SetAsynchPrescaler(RTC, 127);
+	LL_RTC_SetSynchPrescaler(RTC, 255);
+
+	//if we've already initted the clock, do not reset the time/date
+	if ( RTC->ISR & RTC_ISR_INITS )
+	{
+		LL_RTC_DisableWriteProtection(RTC);
+	}
+	else
+	{
+		//explicitly setting the datetime to a default value
+		RTC_TimeStruct.Hours = 0;
+		RTC_TimeStruct.Minutes = 0;
+		RTC_TimeStruct.Seconds = 0;
+		LL_RTC_TIME_Init(RTC, LL_RTC_FORMAT_BCD, &RTC_TimeStruct);
+		RTC_DateStruct.WeekDay = LL_RTC_WEEKDAY_MONDAY;
+		RTC_DateStruct.Day = 1;
+		RTC_DateStruct.Month = LL_RTC_MONTH_JUNE;
+		RTC_DateStruct.Year = 20;
+		LL_RTC_DATE_Init(RTC, LL_RTC_FORMAT_BCD, &RTC_DateStruct);
+	}
+
+#if 0	//goodbye goofy code
   /* USER CODE END RTC_Init 1 */
   /** Initialize RTC and set the Time and Date 
   */
@@ -505,6 +555,7 @@ static void MX_RTC_Init(void)
     LL_RTC_BAK_SetRegister(RTC,LL_RTC_BKP_DR0,0x32F2);
   }
   /* USER CODE BEGIN RTC_Init 2 */
+#endif
 
   /* USER CODE END RTC_Init 2 */
 
