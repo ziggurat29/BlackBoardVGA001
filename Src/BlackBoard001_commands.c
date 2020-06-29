@@ -4,8 +4,8 @@
 //impl
 
 #include "BlackBoard001_commands.h"
-#include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
+#include "main.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -14,7 +14,6 @@
 
 #include "util_altlib.h"
 
-extern RTC_HandleTypeDef hrtc;	//in main.c
 
 #ifndef COUNTOF
 #define COUNTOF(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -204,16 +203,14 @@ static int _setDate ( const IOStreamIF* pio, const char* pszDate )
 		return CMDPROC_ERROR;
 	}
 
-	HAL_PWR_EnableBkUpAccess();	//... and leave it that way
-
-	RTC_DateTypeDef sDate = {0};
-	sDate.WeekDay = RTC_WEEKDAY_SUNDAY;	//(arbitrary)
-	sDate.Date = my_atoul ( &achDate[6], NULL );
+	LL_RTC_DateTypeDef RTC_DateStruct = {0};
+	RTC_DateStruct.WeekDay = LL_RTC_WEEKDAY_SUNDAY;	//(arbitrary)
+	RTC_DateStruct.Day = my_atoul ( &achDate[6], NULL );
 	achDate[6] = '\0';
-	sDate.Month = my_atoul ( &achDate[4], NULL );
+	RTC_DateStruct.Month = my_atoul ( &achDate[4], NULL );
 	achDate[4] = '\0';
-	sDate.Year = my_atoul ( &achDate[0], NULL ) - 2000;
-	HAL_RTC_SetDate ( &hrtc, &sDate, RTC_FORMAT_BIN );
+	RTC_DateStruct.Year = my_atoul ( &achDate[0], NULL ) - 2000;
+	LL_RTC_DATE_Init(RTC, LL_RTC_FORMAT_BIN, &RTC_DateStruct);
 
 	return 1;
 }
@@ -236,18 +233,14 @@ static int _setTime ( const IOStreamIF* pio, const char* pszTime )
 		return CMDPROC_ERROR;
 	}
 
-	HAL_PWR_EnableBkUpAccess();	//... and leave it that way
-	RTC_TimeTypeDef sTime = {0};
+	LL_RTC_TimeTypeDef RTC_TimeStruct = {0};
 	//careful:  the following works only because an empty field == zero
-	sTime.Seconds = my_atoul ( &achTime[4], NULL );
+	RTC_TimeStruct.Seconds = my_atoul ( &achTime[4], NULL );
 	achTime[4] = '\0';
-	sTime.Minutes = my_atoul ( &achTime[2], NULL );
+	RTC_TimeStruct.Minutes = my_atoul ( &achTime[2], NULL );
 	achTime[2] = '\0';
-	sTime.Hours = my_atoul ( &achTime[0], NULL );
-	//and the other stuff
-	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-	sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-	HAL_RTC_SetTime ( &hrtc, &sTime, RTC_FORMAT_BIN );
+	RTC_TimeStruct.Hours = my_atoul ( &achTime[0], NULL );
+	LL_RTC_TIME_Init(RTC, LL_RTC_FORMAT_BIN, &RTC_TimeStruct);
 
 	return 1;
 }
@@ -318,22 +311,18 @@ static CmdProcRetval cmdhdlSet ( const IOStreamIF* pio, const char* pszszTokens 
 		//list all settings and their current value
 
 		//RTC date time
-		RTC_TimeTypeDef sTime;
-		RTC_DateTypeDef sDate;
-		HAL_RTC_GetTime ( &hrtc, &sTime, RTC_FORMAT_BIN );
-		HAL_RTC_GetDate ( &hrtc, &sDate, RTC_FORMAT_BIN );
 		_cmdPutString ( pio, "datetime:  " );
-		_cmdPutInt ( pio, sDate.Year + 2000, 4 );
+		_cmdPutInt ( pio, __LL_RTC_CONVERT_BCD2BIN(LL_RTC_DATE_GetYear(RTC)) + 2000, 4 );
 		_cmdPutChar ( pio, '-' );
-		_cmdPutInt ( pio, sDate.Month, 2 );
+		_cmdPutInt ( pio, __LL_RTC_CONVERT_BCD2BIN(LL_RTC_DATE_GetMonth(RTC)), 2 );
 		_cmdPutChar ( pio, '-' );
-		_cmdPutInt ( pio, sDate.Date, 2 );
+		_cmdPutInt ( pio, __LL_RTC_CONVERT_BCD2BIN(LL_RTC_DATE_GetDay(RTC)), 2 );
 		_cmdPutChar ( pio, ' ' );
-		_cmdPutInt ( pio, sTime.Hours, 2 );
+		_cmdPutInt ( pio, __LL_RTC_CONVERT_BCD2BIN(LL_RTC_TIME_GetHour(RTC)), 2 );
 		_cmdPutChar ( pio, ':' );
-		_cmdPutInt ( pio, sTime.Minutes, 2 );
+		_cmdPutInt ( pio, __LL_RTC_CONVERT_BCD2BIN(LL_RTC_TIME_GetMinute(RTC)), 2 );
 		_cmdPutChar ( pio, ':' );
-		_cmdPutInt ( pio, sTime.Seconds, 2 );
+		_cmdPutInt ( pio, __LL_RTC_CONVERT_BCD2BIN(LL_RTC_TIME_GetSecond(RTC)), 2 );
 		_cmdPutCRLF(pio);
 
 		CWCMD_SendPrompt ( pio );

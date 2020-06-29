@@ -134,7 +134,6 @@ void* __wrap__realloc_r ( struct _reent* r, void* pv, size_t size ) { return pvP
 //So just copy whatever it is above.
 #if 1
 
-RTC_HandleTypeDef hrtc __ccram;
 //DMA 'handles' cannot be in CCM because the DMA controller will access some members and CCM is inaccessible to the DMA controllers.
 SD_HandleTypeDef hsd;// __ccram;
 DMA_HandleTypeDef hdma_sdio_rx;// __ccram;
@@ -149,8 +148,6 @@ osStaticThreadDef_t defaultTaskControlBlock __ccram;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-
-RTC_HandleTypeDef hrtc;
 
 SD_HandleTypeDef hsd;
 DMA_HandleTypeDef hdma_sdio_rx;
@@ -475,58 +472,39 @@ static void MX_RTC_Init(void)
 	__HAL_RCC_RTC_ENABLE();
   /* USER CODE END RTC_Init 0 */
 
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
+  LL_RTC_InitTypeDef RTC_InitStruct = {0};
+  LL_RTC_TimeTypeDef RTC_TimeStruct = {0};
+  LL_RTC_DateTypeDef RTC_DateStruct = {0};
+
+  /* Peripheral clock enable */
+  LL_RCC_EnableRTC();
 
   /* USER CODE BEGIN RTC_Init 1 */
 
   /* USER CODE END RTC_Init 1 */
-  /** Initialize RTC Only 
-  */
-  hrtc.Instance = RTC;
-  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
-  hrtc.Init.AsynchPrediv = 127;
-  hrtc.Init.SynchPrediv = 255;
-  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
-  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
-  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
-  if (HAL_RTC_Init(&hrtc) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /* USER CODE BEGIN Check_RTC_BKUP */
-	//if we've already initted the clock, do not reset the time/date
-	if ( hrtc.Instance->ISR & RTC_FLAG_INITS )
-	{
-		__HAL_RTC_WRITEPROTECTION_DISABLE(&hrtc);
-	}
-	else
-	{
-  /* USER CODE END Check_RTC_BKUP */
-
   /** Initialize RTC and set the Time and Date 
   */
-  sTime.Hours = 0x0;
-  sTime.Minutes = 0x0;
-  sTime.Seconds = 0x0;
-  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-  sDate.Month = RTC_MONTH_JUNE;
-  sDate.Date = 0x1;
-  sDate.Year = 0x20;
-
-  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
-  {
-    Error_Handler();
+  RTC_InitStruct.HourFormat = LL_RTC_HOURFORMAT_24HOUR;
+  RTC_InitStruct.AsynchPrescaler = 127;
+  RTC_InitStruct.SynchPrescaler = 255;
+  LL_RTC_Init(RTC, &RTC_InitStruct);
+  LL_RTC_SetAsynchPrescaler(RTC, 127);
+  LL_RTC_SetSynchPrescaler(RTC, 255);
+  /** Initialize RTC and set the Time and Date 
+  */
+  if(LL_RTC_BAK_GetRegister(RTC, LL_RTC_BKP_DR0) != 0x32F2){
+  
+  RTC_TimeStruct.Hours = 0;
+  RTC_TimeStruct.Minutes = 0;
+  RTC_TimeStruct.Seconds = 0;
+  LL_RTC_TIME_Init(RTC, LL_RTC_FORMAT_BCD, &RTC_TimeStruct);
+  RTC_DateStruct.WeekDay = LL_RTC_WEEKDAY_MONDAY;
+  RTC_DateStruct.Month = LL_RTC_MONTH_JUNE;
+  RTC_DateStruct.Year = 20;
+  LL_RTC_DATE_Init(RTC, LL_RTC_FORMAT_BCD, &RTC_DateStruct);
+    LL_RTC_BAK_SetRegister(RTC,LL_RTC_BKP_DR0,0x32F2);
   }
   /* USER CODE BEGIN RTC_Init 2 */
-	}
 
   /* USER CODE END RTC_Init 2 */
 
