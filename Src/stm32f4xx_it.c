@@ -57,9 +57,17 @@ extern void DMA2S5_HalfCpl_ISR (void);
 extern void DMA2S5_Error_ISR (void);
 extern void DMA2S5_Abort_ISR (void);
 
-void EXTI_3_ISR ( void );
-void EXTI_4_ISR ( void );
-void EXTI_6_ISR ( void );
+extern void EXTI_3_ISR ( void );
+extern void EXTI_4_ISR ( void );
+extern void EXTI_6_ISR ( void );
+
+#if HAVE_UART1
+extern void USART1_TBMT_ISR ( void );
+extern void USART1_DAV_ISR ( uint8_t val );
+__weak void USART1_ERROR_ISR ( uint32_t sr ) {}
+__weak void USART1_CTS_ISR ( uint32_t sr ) {}
+#endif
+
 
 /* USER CODE END PFP */
 
@@ -73,7 +81,6 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern DMA_HandleTypeDef hdma_sdio_rx;
 extern DMA_HandleTypeDef hdma_sdio_tx;
 extern SD_HandleTypeDef hsd;
-extern UART_HandleTypeDef huart1;
 extern TIM_HandleTypeDef htim12;
 
 /* USER CODE BEGIN EV */
@@ -329,8 +336,40 @@ void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
 
+	uint32_t sr = USART1->SR;
+
+	if ( ( sr & USART_SR_CTS ) && LL_USART_IsEnabledIT_CTS(USART1) )
+	{
+		LL_USART_ClearFlag_nCTS(USART1);
+#if HAVE_UART1
+		USART1_CTS_ISR ( sr );
+#endif
+	}
+
+	if ( (sr & USART_SR_RXNE) )
+	{
+		uint8_t val = LL_USART_ReceiveData8(USART1);
+#if HAVE_UART1
+		if ( LL_USART_IsEnabledIT_RXNE(USART1) )
+			USART1_DAV_ISR ( val );
+#endif
+	}
+
+	if ( (sr & USART_SR_TXE) && LL_USART_IsEnabledIT_TXE(USART1) )
+	{
+#if HAVE_UART1
+		USART1_TBMT_ISR();
+#endif
+	}
+
+	if ( sr & (USART_SR_PE|USART_SR_ORE) )
+	{
+#if HAVE_UART1
+		USART1_ERROR_ISR ( sr );
+#endif
+	}
+
   /* USER CODE END USART1_IRQn 0 */
-  HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
 
   /* USER CODE END USART1_IRQn 1 */

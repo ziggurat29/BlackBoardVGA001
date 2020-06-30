@@ -9,16 +9,15 @@
 #include "serial_devices.h"
 
 #include "main.h"
-#include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
 #if HAVE_USBCDC
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
 #endif
 
-//#include "lamps.h"
-
 #include "util_circbuff2.h"
+
+#include <string.h>
 
 
 
@@ -109,12 +108,6 @@ static int Serial_receiveCompletely ( const IOStreamIF* pcom, void* pv, const si
 #if HAVE_UART1
 
 
-//Because of the peculiarities of the STM32CubeMX, we are leaving these things
-//in main.c.  They come from generated code, and if we fight the system, we
-//will be in an eternal struggle of light against darkness. So we go to the
-//dark side and leave them there.
-extern UART_HandleTypeDef huart1;
-
 
 //UART transmit/receive circular buffers
 CIRCBUF(UART1_txbuff,uint8_t,128);
@@ -157,7 +150,7 @@ const IOStreamIF g_pifUART1 = {
 	UART1_receive,
 	Serial_transmitCompletely,
 	Serial_receiveCompletely,
-	&huart1
+	USART1
 };
 
 
@@ -165,36 +158,9 @@ const IOStreamIF g_pifUART1 = {
 //UART support; this glues the UART to the relevant circular buffers
 
 
-//goofy kickstarters; the STM HAL functions take a pointer to a buffer which
-//needs to be stable for later processing at ISR time, so we have these
-//knumbskull 1-byte buffers to satisfy that.  There could be a way for me
-//to point directly into the circular queue space, but it would be messy and
-//bug-prone, so I am punting on that now.  Later, I'll probably write my own
-//low-level UART code, since I'm not in love with the HAL API for that, anyway.
-
-static volatile uint8_t _byTxNow;	//knumbskull TX buffer for UART1
-static void __kickstartTransmitUART1()
-{
-	circbuff_dequeue(&UART1_txbuff,(void*)&_byTxNow);	//
-	if(HAL_UART_Transmit_IT(&huart1, (uint8_t*)&_byTxNow, sizeof(_byTxNow)) != HAL_OK)
-	{
-		//XXX horror
-//		LightLamp ( 2000, &g_lltOr, _ledOnWh );
-	}
-}
-
-volatile uint8_t _byRxNow;	//knumbskull RX buffer for UART1
-static void __kickstartReceiveUART1()
-{
-	//set up to receive more
-	//if ( HAL_UART_STATE_BUSY_RX == huart1.State || HAL_UART_STATE_BUSY_TX_RX == huart1.State )	//must grope for RX only state
-	if(HAL_UART_Receive_IT(&huart1, (uint8_t*)&_byRxNow, sizeof(_byRxNow)) != HAL_OK)
-	{
-		//XXX horror
-//		LightLamp ( 2000, &g_lltOr, _ledOnWh );
-	}
-}
-
+//note that there is implementation in stm32f4xx_it.c that provides top-level
+//handling of the USART1 global IRQ, which forwards into here.
+//void USART1_IRQHandler(void)
 
 
 //our stub implementation of the optional notification callbacks
@@ -204,63 +170,60 @@ __weak void UART1_TransmitEmpty ( void ){}
 
 
 //A UART has completed transmission.  Push more if we've got it.
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+void USART1_TBMT_ISR ( void )
 {
-	if ( USART1 == huart->Instance )
+	int bEmpty;
+	UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();	//lock queue
+	//if there is more in the queue, pluck and transmit
+	if ( ! circbuff_empty(&UART1_txbuff) )
 	{
-		int bEmpty;
-		UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();	//lock queue
-		//if there is more in the queue, pluck and transmit
-		if ( ! circbuff_empty(&UART1_txbuff) )
-		{
-			__kickstartTransmitUART1();
-			bEmpty = 0;
-		}
-		else
-		{
-			bEmpty = 1;
-		}
-		taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);	//unlock queue
-		if ( bEmpty )
-			UART1_TransmitEmpty();	//notify anyone interested
+		uint8_t byTxNow;
+		circbuff_dequeue(&UART1_txbuff,(void*)&byTxNow);
+		LL_USART_TransmitData8(USART1, byTxNow);
+		bEmpty = 0;
 	}
+	else
+	{
+		LL_USART_DisableIT_TXE(USART1);	//stop interrupting
+		bEmpty = 1;
+	}
+	taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);	//unlock queue
+	if ( bEmpty )
+		UART1_TransmitEmpty();	//notify anyone interested
 }
 
 
 
 //A UART has completed reception.  Stick it in our queue if we can.
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void USART1_DAV_ISR ( uint8_t val )
 {
-	if ( USART1 == huart->Instance )
+	UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();	//lock queue
+	if ( ! circbuff_full(&UART1_rxbuff) )
 	{
-		UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();	//lock queue
-		if ( ! circbuff_full(&UART1_rxbuff) )
-		{
-			circbuff_enqueue ( &UART1_rxbuff, (void*)&_byRxNow );
-		}
-		else
-		{
-			//XXX horror; buffer overrun
-//			LightLamp ( 2000, &g_lltOr, _ledOnWh );
-		}
-		//either way, set up to receive more
-		__kickstartReceiveUART1();
-		taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);	//unlock queue
-		UART1_DataAvailable();	//notify anyone interested
+		circbuff_enqueue ( &UART1_rxbuff, (void*)&val );
 	}
+	else
+	{
+		//XXX horror; buffer overrun
+	}
+	taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);	//unlock queue
+	UART1_DataAvailable();	//notify anyone interested
 }
 
 
 
 //UART error
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+void USART1_ERROR_ISR ( uint32_t sr )
 {
-	if ( USART1 == huart->Instance )
-	{
-		//XXX III
-	}
+	//XXX III
 }
 
+
+//CTS transitioned
+void USART1_CTS_ISR ( uint32_t sr )
+{
+	//XXX III
+}
 
 
 //====================================================
@@ -289,28 +252,23 @@ static size_t UART1_transmit ( const IOStreamIF* pthis, const void* pv, size_t n
 {
 	size_t nPushed;
 	UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();	//lock queue
-	size_t nToPush = circbuff_capacity(&UART1_txbuff) - circbuff_count(&UART1_txbuff);	//max you could push
+	size_t nCount = circbuff_count(&UART1_txbuff);
+	size_t nToPush = circbuff_capacity(&UART1_txbuff) - nCount;	//max you could push
 	if ( nLen < nToPush )	//no buffer overruns, please
 		nToPush = nLen;
 	for ( nPushed = 0; nPushed < nToPush; ++nPushed )
 	{
 		circbuff_enqueue ( &UART1_txbuff, &((uint8_t*)pv)[nPushed] );
 	}
+	nCount += nPushed;
 	//if the transmitter is idle, we will need to kickstart it
-	//old HAL lib had one state var
-	//if ( HAL_UART_STATE_READY == huart1.State ||
-	//		HAL_UART_STATE_BUSY_RX == huart1.State
-	//	)	//must grope for TX only ready state
-	//new HAL lib split state into two vars
-	if ( HAL_UART_STATE_READY == huart1.gState )	//must grope for TX only ready state
+	if ( ! LL_USART_IsEnabledIT_TXE ( USART1 ) && 0 != nCount )
 	{
-		__kickstartTransmitUART1();
-	}
-	else
-	{
-		//dummy = 0;
+		LL_USART_EnableIT_TXE(USART1);	//interrupt to start plucking
 	}
 	taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);	//unlock queue
+	if ( 0 == nCount )
+		UART1_TransmitEmpty();	//notify anyone interested
 	return nPushed;
 }
 
@@ -361,8 +319,13 @@ void UART1_Init ( void )
 {
 	circbuff_init(&UART1_txbuff);
 	circbuff_init(&UART1_rxbuff);
-	//set up the receive action on UART 1
-	__kickstartReceiveUART1();
+
+	//LL, we just set up for interrupts
+	LL_USART_EnableIT_RXNE(USART1);		//dav
+	//LL_USART_EnableIT_TXE(USART1);		//tbmt
+	//LL_USART_EnableIT_PE(USART1);		//pe
+	//LL_USART_EnableIT_ERROR(USART1);	//ore, nf, fe
+	//LL_USART_DisableIT_CTS(USART1);	//CTS transition
 }
 
 #endif

@@ -138,7 +138,6 @@ void* __wrap__realloc_r ( struct _reent* r, void* pv, size_t size ) { return pvP
 SD_HandleTypeDef hsd;// __ccram;
 DMA_HandleTypeDef hdma_sdio_rx;// __ccram;
 DMA_HandleTypeDef hdma_sdio_tx;// __ccram;
-UART_HandleTypeDef huart1 __ccram;
 
 osThreadId defaultTaskHandle __ccram;
 uint32_t defaultTaskBuffer[ 128 ] __ccram;
@@ -152,8 +151,6 @@ osStaticThreadDef_t defaultTaskControlBlock __ccram;
 SD_HandleTypeDef hsd;
 DMA_HandleTypeDef hdma_sdio_rx;
 DMA_HandleTypeDef hdma_sdio_tx;
-
-UART_HandleTypeDef huart1;
 
 osThreadId defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 128 ];
@@ -240,6 +237,17 @@ int main(void)
 	//of making it obvious that this chore simply must be done.
 	XXX_USBCDC_PresenceHack();	//this does nothing real; do not delete
 #endif
+
+
+	//if there are any __ccram objects that need static initialization, you'll
+	//need to do that here because the startup code does not init them out-of-
+	//box like it does with the .data section (alternatively, you can modify
+	//the startup_stm32f407xx.s to do this, along with some linker script
+	//shenanigans to set up the needed symbols).
+	defaultTaskHandle = NULL;
+	g_thMonitor = NULL;
+	g_pMonitorIOIf = NULL;
+
 
   /* USER CODE END Init */
 
@@ -822,21 +830,43 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 0 */
 
+  LL_USART_InitTypeDef USART_InitStruct = {0};
+
+  LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  /* Peripheral clock enable */
+  LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_USART1);
+  
+  LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
+  /**USART1 GPIO Configuration  
+  PA9   ------> USART1_TX
+  PA10   ------> USART1_RX 
+  */
+  GPIO_InitStruct.Pin = LL_GPIO_PIN_9|LL_GPIO_PIN_10;
+  GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
+  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+  GPIO_InitStruct.Alternate = LL_GPIO_AF_7;
+  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* USART1 interrupt Init */
+  NVIC_SetPriority(USART1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),5, 0));
+  NVIC_EnableIRQ(USART1_IRQn);
+
   /* USER CODE BEGIN USART1_Init 1 */
 
   /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  USART_InitStruct.BaudRate = 115200;
+  USART_InitStruct.DataWidth = LL_USART_DATAWIDTH_8B;
+  USART_InitStruct.StopBits = LL_USART_STOPBITS_1;
+  USART_InitStruct.Parity = LL_USART_PARITY_NONE;
+  USART_InitStruct.TransferDirection = LL_USART_DIRECTION_TX_RX;
+  USART_InitStruct.HardwareFlowControl = LL_USART_HWCONTROL_NONE;
+  USART_InitStruct.OverSampling = LL_USART_OVERSAMPLING_16;
+  LL_USART_Init(USART1, &USART_InitStruct);
+  LL_USART_ConfigAsyncMode(USART1);
+  LL_USART_Enable(USART1);
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
@@ -1028,9 +1058,16 @@ void __startWorkerTasks ( void )
 //miscellaneous hooks of our creation
 
 
+//in this logic, we prefer USART1 over USBCDC
+#if HAVE_UART1
+#define PREFER_USART1 1
+#elif HAVE_USBCDC
+#define PREFER_USBCDC 1
+#endif
 
-//SSS sync this with interface binding, below
-#if HAVE_USBCDC
+
+
+#if PREFER_USBCDC
 
 //well-discplined serial clients will assert DTR, and we
 //can use that as an indication that a client application
@@ -1050,35 +1087,36 @@ void USBCDC_DTR ( int bAssert )
 
 //(unneeded)
 //void USBCDC_RTS ( int bAssert ) { }
-#elif HAVE_UART1
 #endif
 
 
 
 
-//SSS sync this with interface binding, below
-#if HAVE_USBCDC
+#if PREFER_USBCDC
 void USBCDC_DataAvailable ( void )
-#elif HAVE_UART1
+#elif PREFER_USART1
 void UART1_DataAvailable ( void )
 #endif
+#if PREFER_USBCDC || PREFER_USART1
 {
 	//this notification is required because our Monitor is implemented with the
 	//non-blocking command interface, so we need to know when to wake and bake.
 	Monitor_DAV();
 }
+#endif
 
 
-//SSS sync this with interface binding, below
-#if HAVE_USBCDC
+#if PREFER_USBCDC
 void USBCDC_TransmitEmpty ( void )
-#elif HAVE_UART1
+#elif PREFER_USART1
 void UART1_TransmitEmpty ( void )
 #endif
+#if PREFER_USBCDC || PREFER_USART1
 {
 	//we don't really need this, but here's how you do it
 	Monitor_TBMT();
 }
+#endif
 
 
 
@@ -1138,42 +1176,7 @@ void EXTI_6_ISR ( void )
 
 
 
-#if 0
-
 //SPI1 Init for W25Q16 Flash 2MB; 50 MHz max, so we divide down to 42 MHz
-static void MX_SPI1_Init_Flash(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-	HAL_SPI_DeInit(&hspi1);
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-#endif
 
 
 
@@ -1221,11 +1224,10 @@ void StartDefaultTask(void const * argument)
 
 	//bind the interfaces to the relevant devices
 	//these 'HAVE_xxx' macros are in the preprocessor defs of the project
-	//SSS the following logic must be kept in sync with logic up above
-#if HAVE_USBCDC
+#if PREFER_USBCDC
 	//we'll prefer the USB CDC if we've defined support for both
 	g_pMonitorIOIf = &g_pifCDC;		//monitor is on USB CDC
-#elif HAVE_UART1
+#elif PREFER_USART1
 	g_pMonitorIOIf = &g_pifUART1;	//monitor is on UART1
 #endif
 
@@ -1364,8 +1366,7 @@ void StartDefaultTask(void const * argument)
 	{
 	volatile size_t nPushed;
 
-#if HAVE_USBCDC
-#elif HAVE_UART1 && defined(DEBUG)
+#if PREFER_USART1 && defined(DEBUG)
 	//the uart1 monitor is for my debugging convenience, but it doesn't have a
 	//'client connected' event, so squirt out a string to make it obvious we
 	//are live
