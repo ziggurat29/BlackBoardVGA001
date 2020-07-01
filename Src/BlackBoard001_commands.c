@@ -247,6 +247,33 @@ static int _setTime ( const IOStreamIF* pio, const char* pszTime )
 
 
 
+static char _nybbleToChar ( uint8_t nyb )
+{
+	char ret = nyb + '0';
+	if ( nyb > 9 )
+		ret += 'a' - '9' - 1;
+	return ret;
+}
+
+
+
+static void _putHexUint32 ( const IOStreamIF* pio, uint32_t val )
+{
+	char ach[9];
+	char* pach = &ach[8];	//end
+	*pach = '\0';
+	do	//easiest to go backwards
+	{
+		--pach;
+		*pach = _nybbleToChar ( val & 0xf );
+		val >>= 4;
+	} while ( pach != ach );
+	_cmdPutString ( pio, ach );
+}
+
+
+
+
 //========================================================================
 
 
@@ -450,6 +477,85 @@ static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens
 	_cmdPutInt ( pio, g_nMinStackFreeMonitor*sizeof(uint32_t), 0 );
 	_cmdPutCRLF(pio);
 
+
+	//show various memory regions of interest
+	//XXX maybe add more PROVIDEs in linker script to avoid these carnal constants
+	extern char _sccmram asm("_sccmram");
+	extern char _eccmram asm("_eccmram");
+	_cmdPutString ( pio, "ccm: 0x" );
+	_putHexUint32 ( pio, (uint32_t)&_sccmram );
+	_cmdPutString ( pio, " - 0x1000ffff, used " );
+	_cmdPutInt ( pio, &_eccmram - &_sccmram, 0 );
+	_cmdPutString ( pio, " rem " );
+	_cmdPutInt ( pio, (char*)0x10010000 - &_eccmram, 0 );
+	_cmdPutCRLF(pio);
+
+	extern char _sdata asm("_sdata");
+	extern char _end asm("_end");
+	_cmdPutString ( pio, "sram1: 0x" );
+	_putHexUint32 ( pio, (uint32_t)&_sdata );
+	_cmdPutString ( pio, " - 0x2001bfff, used " );
+	_cmdPutInt ( pio, &_end - &_sdata, 0 );
+	_cmdPutString ( pio, " rem " );
+	_cmdPutInt ( pio, (char*)0x2001c000 - &_end, 0 );
+	_cmdPutCRLF(pio);
+	
+	extern char _edata asm("_edata");
+	extern char _sbss asm("_sbss");
+	extern char _ebss asm("_ebss");
+	_cmdPutString ( pio, "  data @ 0x" );
+	_putHexUint32 ( pio, (uint32_t)&_sdata );
+	_cmdPutString ( pio, "[" );
+	_cmdPutInt ( pio, &_edata - &_sdata, 0 );
+	_cmdPutString ( pio, "], bss @ 0x" );
+	_putHexUint32 ( pio, (uint32_t)&_sbss );
+	_cmdPutString ( pio, "[" );
+	_cmdPutInt ( pio, &_ebss - &_sbss, 0 );
+	_cmdPutString ( pio, "], rest @ 0x" );
+	_putHexUint32 ( pio, (uint32_t)&_end );
+	_cmdPutString ( pio, "[" );
+	_cmdPutInt ( pio, (char*)0x2001c000 - &_end, 0 );
+	_cmdPutString ( pio, "]\r\n" );
+	
+	extern uint8_t ucHeap;
+	_cmdPutString ( pio, "  heap @ 0x" );
+	_putHexUint32 ( pio, (uint32_t)&ucHeap );
+	_cmdPutString ( pio, "[" );
+	_cmdPutInt ( pio, configTOTAL_HEAP_SIZE, 0 );
+	_cmdPutString ( pio, "]\r\n" );
+
+	extern char _sram2 asm("_sram2");
+	extern char _eram2 asm("_eram2");
+	_cmdPutString ( pio, "sram2: 0x" );
+	_putHexUint32 ( pio, (uint32_t)&_sram2 );
+	_cmdPutString ( pio, " - 0x2001ffff, used ");
+	_cmdPutInt ( pio, &_eram2 - &_sram2, 0 );
+	_cmdPutString ( pio, " rem " );
+	_cmdPutInt ( pio, (char*)0x20020000 - &_eram2, 0 );
+	_cmdPutCRLF(pio);
+
+	extern char _sbkram asm("_sbkram");
+	extern char _ebkram asm("_ebkram");
+	_cmdPutString ( pio, "bkram: 0x" );
+	_putHexUint32 ( pio, (uint32_t)&_sbkram );
+	_cmdPutString ( pio, " - 0x40024fff, used " );
+	_cmdPutInt ( pio, &_ebkram - &_sbkram, 0 );
+	_cmdPutString ( pio, " rem " );
+	_cmdPutInt ( pio, (char*)0x40025000 - &_ebkram, 0 );
+	_cmdPutCRLF(pio);
+
+	extern char _sbkram asm("_sbkram");
+	extern char _etext asm("_etext");
+	extern char __fini_array_end asm("__fini_array_end");
+	_cmdPutString ( pio, "flash: 0x08000000" );
+	_cmdPutString ( pio, " - 0x08080000, used " );
+	_cmdPutInt ( pio, &__fini_array_end - (char*)0x08000000, 0 );
+	_cmdPutString ( pio, " rem " );
+	_cmdPutInt ( pio, (char*)0x08080000 - &__fini_array_end, 0 );
+	_cmdPutCRLF(pio);
+
+
+
 	CWCMD_SendPrompt ( pio );
 	return CMDPROC_SUCCESS;
 }
@@ -466,16 +572,6 @@ static char _printableChar ( char ch )
 	if ( ( ch < ' ' ) || ( ch > 0x7f ) ) ch='.';
 	return ch;
 }
-
-
-static char _nybbleToChar ( uint8_t nyb )
-{
-	char ret = nyb + '0';
-	if ( nyb > 9 )
-		ret += 'a' - '9' - 1;
-	return ret;
-}
-
 
 
 static CmdProcRetval cmdhdlDump ( const IOStreamIF* pio, const char* pszszTokens )
