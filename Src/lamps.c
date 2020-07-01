@@ -25,9 +25,9 @@ void _ledOnD2 ( void ) { LL_GPIO_ResetOutputPin(LED_D2_GPIO_Port, LED_D2_Pin); }
 void _ledOffD2 ( void ) { LL_GPIO_SetOutputPin(LED_D2_GPIO_Port, LED_D2_Pin); }
 void _ledToggleD2 ( void ) { LL_GPIO_TogglePin (LED_D2_GPIO_Port, LED_D2_Pin); }
 
-void _ledOnD3 ( void ) { LL_GPIO_ResetOutputPin(LED_D3_GPIO_Port, LED_D3_Pin); }
-void _ledOffD3 ( void ) { LL_GPIO_SetOutputPin(LED_D3_GPIO_Port, LED_D3_Pin); }
-void _ledToggleD3 ( void ) { LL_GPIO_TogglePin (LED_D3_GPIO_Port, LED_D3_Pin); }
+//void _ledOnD3 ( void ) { LL_GPIO_ResetOutputPin(LED_D3_GPIO_Port, LED_D3_Pin); }
+//void _ledOffD3 ( void ) { LL_GPIO_SetOutputPin(LED_D3_GPIO_Port, LED_D3_Pin); }
+//void _ledToggleD3 ( void ) { LL_GPIO_TogglePin (LED_D3_GPIO_Port, LED_D3_Pin); }
 
 
 //diagnostic LED start times and durations
@@ -38,7 +38,7 @@ struct LED_LightTime
 };
 
 LED_LightTime g_lltD2 = {0};
-LED_LightTime g_lltD3 = {0};
+//LED_LightTime g_lltD3 = {0};
 
 
 

@@ -31,6 +31,7 @@ extern "C" {
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_ll_dac.h"
 #include "stm32f4xx_ll_dma.h"
+#include "stm32f4xx_hal.h"
 #include "stm32f4xx_ll_rcc.h"
 #include "stm32f4xx_ll_bus.h"
 #include "stm32f4xx_ll_system.h"
@@ -39,7 +40,6 @@ extern "C" {
 #include "stm32f4xx_ll_utils.h"
 #include "stm32f4xx_ll_pwr.h"
 #include "stm32f4xx_ll_rtc.h"
-#include "stm32f4xx_hal.h"
 #include "stm32f4xx_ll_spi.h"
 #include "stm32f4xx_ll_tim.h"
 #include "stm32f4xx_ll_usart.h"
@@ -84,8 +84,6 @@ void Error_Handler(void);
 #define BOGO_CARDDETECT_GPIO_Port GPIOC
 #define LED_D2_Pin LL_GPIO_PIN_6
 #define LED_D2_GPIO_Port GPIOA
-#define LED_D3_Pin LL_GPIO_PIN_7
-#define LED_D3_GPIO_Port GPIOA
 #define FLASH_CS_Pin LL_GPIO_PIN_0
 #define FLASH_CS_GPIO_Port GPIOB
 #define R0_Pin LL_GPIO_PIN_8

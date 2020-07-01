@@ -22,6 +22,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "fatfs.h"
+#include "lwip.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -922,7 +923,7 @@ static void MX_GPIO_Init(void)
   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOD);
 
   /**/
-  LL_GPIO_SetOutputPin(GPIOA, LED_D2_Pin|LED_D3_Pin);
+  LL_GPIO_SetOutputPin(LED_D2_GPIO_Port, LED_D2_Pin);
 
   /**/
   LL_GPIO_SetOutputPin(FLASH_CS_GPIO_Port, FLASH_CS_Pin);
@@ -989,12 +990,12 @@ static void MX_GPIO_Init(void)
   LL_GPIO_Init(BOGO_CARDDETECT_GPIO_Port, &GPIO_InitStruct);
 
   /**/
-  GPIO_InitStruct.Pin = LED_D2_Pin|LED_D3_Pin;
+  GPIO_InitStruct.Pin = LED_D2_Pin;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
   GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
   GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_OPENDRAIN;
   GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  LL_GPIO_Init(LED_D2_GPIO_Port, &GPIO_InitStruct);
 
   /**/
   GPIO_InitStruct.Pin = FLASH_CS_Pin;
@@ -1194,6 +1195,9 @@ void StartDefaultTask(void const * argument)
 {
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
+
+  /* init code for LWIP */
+  MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
 
 	//
@@ -1356,7 +1360,7 @@ void StartDefaultTask(void const * argument)
 
 	//light some lamps on a countdown
 	LightLamp ( 1000, &g_lltD2, _ledOnD2 );
-	LightLamp ( 2000, &g_lltD3, _ledOnD3 );
+	//LightLamp ( 2000, &g_lltD3, _ledOnD3 );
 
 	//start up worker threads
 	__startWorkerTasks();
@@ -1434,7 +1438,7 @@ void StartDefaultTask(void const * argument)
 		uint32_t now = HAL_GetTick();
 		uint32_t remMin = 0xffffffff;	//nothing yet
 		ProcessLightOffTime ( now, &remMin, &g_lltD2, _ledOffD2 );
-		ProcessLightOffTime ( now, &remMin, &g_lltD3, _ledOffD3 );
+		//ProcessLightOffTime ( now, &remMin, &g_lltD3, _ledOffD3 );
 
 		//don't wait longer than 3 sec
 		if ( remMin > 3000 )
