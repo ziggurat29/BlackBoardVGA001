@@ -436,6 +436,8 @@ extern volatile int g_nMaxCDCRxQueue;
 #endif
 extern volatile int g_nMinStackFreeDefault;
 extern volatile int g_nMinStackFreeMonitor;
+extern volatile int g_nMinStackFreeTCP;
+extern volatile int g_nMinStackFreeETH;
 
 #define USE_FREERTOS_HEAP_IMPL 1
 #if USE_FREERTOS_HEAP_IMPL
@@ -613,6 +615,13 @@ static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens
 	_cmdPutInt ( pio, g_nMinStackFreeMonitor*sizeof(uint32_t), 0 );
 	_cmdPutCRLF(pio);
 
+	_cmdPutString ( pio, "Task: TCP: min stack free: " );
+	_cmdPutInt ( pio, g_nMinStackFreeTCP*sizeof(uint32_t), 0 );
+	_cmdPutCRLF(pio);
+
+	_cmdPutString ( pio, "Task: ETH: min stack free: " );
+	_cmdPutInt ( pio, g_nMinStackFreeETH*sizeof(uint32_t), 0 );
+	_cmdPutCRLF(pio);
 
 	//show various memory regions of interest
 	//XXX maybe add more PROVIDEs in linker script to avoid these carnal constants
