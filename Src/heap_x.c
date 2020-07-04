@@ -503,8 +503,8 @@ static int inspectHeapCorruption ( BlockLink_t* pxLinkThis, BlockLink_t* pxLinkL
 		return 2;	/* symptom 2:  block pointer out-of-bounds */
 	if ( pxLinkThis <= pxLinkLast )
 		return 3;	/* symptom 3:  linked list moving backwards */
-	if ( ( bAllocated && ! ( (uintptr_t)pxLinkThis & xBlockAllocatedBit ) ) ||
-			( ! bAllocated && ( (uintptr_t)pxLinkThis & xBlockAllocatedBit ) ) )
+	if ( ( bAllocated && ! ( (uintptr_t)pxLinkThis->xBlockSize & xBlockAllocatedBit ) ) ||
+			( ! bAllocated && ( (uintptr_t)pxLinkThis->xBlockSize & xBlockAllocatedBit ) ) )
 		return 4;	/* symptom 4: unexpected allocation state */
 	return 0;	/* no heap corruption detected */
 }
@@ -527,57 +527,35 @@ int vPortHeapWalk ( CBK_HEAPWALK pfnWalk, void* pinst )
 		mtCOVERAGE_TEST_MARKER();
 	}
 
-	BlockLink_t* pxLinkFree;
+
+	/* blocks are contiguous, so we merely walk them to the end */
+	BlockLink_t* pxLinkPrev;
 	BlockLink_t* pxLinkThis;
-	BlockLink_t* pxLinkLast;
 	int nInspectResult;
 
-	/* the free list is traversed as a linked list, the allocated blocks are
-	  traversed as contiguous blocks between the linked free ones. */
-
-	/* init block pointers */
-	pxLinkFree = xStart.pxNextFreeBlock;
-	pxLinkThis = (BlockLink_t*) ( ucHeap + ( portBYTE_ALIGNMENT - ( (size_t)ucHeap & portBYTE_ALIGNMENT_MASK ) ) );
-	pxLinkLast = NULL;
-
-	/* inspect first block for sanity before proceeding */
-	nInspectResult = inspectHeapCorruption ( pxLinkFree, pxLinkLast, 0 );
-	if ( 0 != nInspectResult )
-		return nInspectResult;
-
-	/* do the heap walk until done */
+	/* start of heap; first block (considering alignment */
+	pxLinkThis = (BlockLink_t*)ucHeap;
+	if( ( (uintptr_t)pxLinkThis & portBYTE_ALIGNMENT_MASK ) != 0 )
+	{
+		*((uint8_t*)pxLinkThis) += ( portBYTE_ALIGNMENT - 1 );
+		pxLinkThis = (BlockLink_t*) ( (uintptr_t)pxLinkThis & ~( ( size_t ) portBYTE_ALIGNMENT_MASK ) );
+	}
+	pxLinkPrev = NULL;	/* no prev block */
 	while ( pxLinkThis != pxEnd )
 	{
-		/* advance through alloc'ed blocks less than the next free'ed block */
-		while ( pxLinkThis < pxLinkFree )
-		{
-			/* inspect this block for sanity */
-			nInspectResult = inspectHeapCorruption ( pxLinkThis, pxLinkLast, 1 );
-			if ( 0 != nInspectResult )
-				return nInspectResult;
-			pxLinkLast = pxLinkThis;
+		int bIsAlloc = pxLinkThis->xBlockSize & xBlockAllocatedBit;
 
-			/* emit data; alloc'ed block */
-			pfnWalk ( pxLinkThis, (pxLinkThis->xBlockSize&~xBlockAllocatedBit), 1, pinst );
-			
-			pxLinkThis = (BlockLink_t*) (((uint8_t*)pxLinkThis) + (pxLinkThis->xBlockSize&~xBlockAllocatedBit));
-		}
-
-		/* now were are doing a single interceding free block */
-		pxLinkThis = pxLinkFree;
-
-		/* inspect this block for sanity */
-		nInspectResult = inspectHeapCorruption ( pxLinkThis, pxLinkLast, 0 );
+		/* inspect for sanity before proceeding */
+		nInspectResult = inspectHeapCorruption ( pxLinkThis, pxLinkPrev, bIsAlloc );
 		if ( 0 != nInspectResult )
 			return nInspectResult;
-		pxLinkLast = pxLinkThis;
 
-		/* emit data; free'ed block */
-		pfnWalk ( pxLinkThis, pxLinkThis->xBlockSize, 0, pinst );
+		/* emit data; alloc'ed block */
+		pfnWalk ( pxLinkThis, (pxLinkThis->xBlockSize&~xBlockAllocatedBit), bIsAlloc, pinst );
 
-		/* advance ptr to next (alloc'ed) block, and next free block */
+		/* advance to next block */
+		pxLinkPrev = pxLinkThis;
 		pxLinkThis = (BlockLink_t*) (((uint8_t*)pxLinkThis) + (pxLinkThis->xBlockSize&~xBlockAllocatedBit));
-		pxLinkFree = pxLinkFree->pxNextFreeBlock;
 	}
 
 	EXIT_MALLOC_CRITICAL(savemask);
