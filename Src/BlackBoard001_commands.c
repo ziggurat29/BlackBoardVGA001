@@ -437,6 +437,82 @@ extern volatile int g_nMaxCDCRxQueue;
 extern volatile int g_nMinStackFreeDefault;
 extern volatile int g_nMinStackFreeMonitor;
 
+#define USE_FREERTOS_HEAP_IMPL 1
+#if USE_FREERTOS_HEAP_IMPL
+//we implemented a 'heapwalk' function
+typedef int (*CBK_HEAPWALK) ( void* pblk, uint32_t nBlkSize, int bIsAlloc, void* pinst );
+extern int vPortHeapWalk ( CBK_HEAPWALK pfnWalk, void* pinst );
+
+
+//heapwalk suspends all tasks, so cannot do io in the callback.  we collect all
+//stats into a structure.
+typedef struct HeapInfo
+{
+	int nFree;				//free blocks
+	size_t nSmallestFree;	//smallest free
+	size_t nLargestFree;	//largest free
+	int nAlloc;				//alloc blocks
+	size_t nSmallestAlloc;	//smallest alloc
+	size_t nLargestAlloc;	//largest alloc
+} HeapInfo;
+
+
+int StatsHWcbk ( void* pblk, uint32_t nBlkSize, int bIsAlloc, void* pinst )
+{
+	HeapInfo* hi = (HeapInfo*) pinst;
+
+	if ( bIsAlloc )
+	{
+		if ( hi->nAlloc > 0 )
+		{
+			++hi->nAlloc;
+			if ( nBlkSize < hi->nSmallestAlloc )
+			{
+				hi->nSmallestAlloc = nBlkSize;
+			}
+			if ( nBlkSize > hi->nLargestAlloc )
+			{
+				hi->nLargestAlloc = nBlkSize;
+			}
+		}
+		else
+		{
+			hi->nAlloc = 1;
+			//init the fields with this first block info
+			hi->nSmallestAlloc = nBlkSize;
+			hi->nLargestAlloc = nBlkSize;
+		}
+	}
+	else
+	{
+		if ( hi->nFree > 0 )
+		{
+			++hi->nFree;
+			if ( nBlkSize < hi->nSmallestFree )
+			{
+				hi->nSmallestFree = nBlkSize;
+			}
+			if ( nBlkSize > hi->nLargestFree )
+			{
+				hi->nLargestFree = nBlkSize;
+			}
+		}
+		else
+		{
+			hi->nFree = 1;
+			//init the fields with this first block info
+			hi->nSmallestFree = nBlkSize;
+			hi->nLargestFree = nBlkSize;
+		}
+	}
+
+	return 1;	//keep walking
+}
+
+
+
+#endif
+
 
 static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens )
 {
@@ -451,6 +527,32 @@ static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens
 	_cmdPutInt ( pio, configTOTAL_HEAP_SIZE - g_nHeapFree, 0 );
 	_cmdPutString ( pio, ", min free ever: " );
 	_cmdPutInt ( pio, g_nMinEverHeapFree, 0 );
+	_cmdPutCRLF(pio);
+
+	//collect heap alloc stats
+	HeapInfo hi;
+	hi.nFree = 0;	//sentinel to cause init with first block
+	hi.nAlloc = 0;	//sentinel to cause init with first block
+	vPortHeapWalk ( StatsHWcbk, &hi );
+	//emit datas
+	_cmdPutString ( pio, "  #free: " );
+	_cmdPutInt ( pio, hi.nFree, 0 );
+	if ( hi.nFree > 0 )
+	{
+		_cmdPutString ( pio, ", smallest: " );
+		_cmdPutInt ( pio, (int)hi.nSmallestFree, 0 );
+		_cmdPutString ( pio, ", largest: " );
+		_cmdPutInt ( pio, (int)hi.nLargestFree, 0 );
+	}
+	_cmdPutString ( pio, "\r\n  #alloc: " );
+	_cmdPutInt ( pio, hi.nAlloc, 0 );
+	if ( hi.nAlloc > 0 )
+	{
+		_cmdPutString ( pio, ", smallest: " );
+		_cmdPutInt ( pio, (int)hi.nSmallestAlloc, 0 );
+		_cmdPutString ( pio, ", largest: " );
+		_cmdPutInt ( pio, (int)hi.nLargestAlloc, 0 );
+	}
 	_cmdPutCRLF(pio);
 
 #if HAVE_UART1
@@ -544,8 +646,7 @@ static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens
 	_cmdPutInt ( pio, (char*)0x40025000 - &_ebkram, 0 );
 	_cmdPutCRLF(pio);
 
-	extern char _sbkram asm("_sbkram");
-	extern char _etext asm("_etext");
+	//extern char _etext asm("_etext");
 	extern char __fini_array_end asm("__fini_array_end");
 	_cmdPutString ( pio, "flash: 0x08000000" );
 	_cmdPutString ( pio, " - 0x08080000, used " );

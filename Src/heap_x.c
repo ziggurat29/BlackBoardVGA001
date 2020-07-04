@@ -510,7 +510,7 @@ static int inspectHeapCorruption ( BlockLink_t* pxLinkThis, BlockLink_t* pxLinkL
 }
 
 
-typedef int (*CBK_HEAPWALK) ( void* pblk, uint32_t nBlkSize, int bIsFree, void* pinst );
+typedef int (*CBK_HEAPWALK) ( void* pblk, uint32_t nBlkSize, int bIsAlloc, void* pinst );
 
 int vPortHeapWalk ( CBK_HEAPWALK pfnWalk, void* pinst )
 {
