@@ -6,6 +6,7 @@
 #include "BlackBoard001_commands.h"
 #include "cmsis_os.h"
 #include "main.h"
+#include "lwip.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -530,6 +531,9 @@ int StatsHWcbk ( void* pblk, uint32_t nBlkSize, int bIsAlloc, void* pinst )
 #endif
 
 
+extern struct netif gnetif;
+
+
 static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens )
 {
 	//list what we've got
@@ -697,6 +701,25 @@ static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens
 	_cmdPutString ( pio, " rem " );
 	_cmdPutInt ( pio, (char*)0x08080000 - &__fini_array_end, 0 );
 	_cmdPutCRLF(pio);
+
+	if (netif_is_link_up(&gnetif))
+	{
+		_cmdPutString ( pio, "ETH: ip " );
+		char achIP[IPADDR_STRLEN_MAX];
+		ipaddr_ntoa_r ( &gnetif.ip_addr, achIP, IPADDR_STRLEN_MAX );
+		_cmdPutString ( pio, achIP );
+		_cmdPutString ( pio, " mask " );
+		ipaddr_ntoa_r ( &gnetif.netmask, achIP, IPADDR_STRLEN_MAX );
+		_cmdPutString ( pio, achIP );
+		_cmdPutString ( pio, " gw " );
+		ipaddr_ntoa_r ( &gnetif.gw, achIP, IPADDR_STRLEN_MAX );
+		_cmdPutString ( pio, achIP );
+		_cmdPutCRLF(pio);
+	}
+	else
+	{
+		_cmdPutString ( pio, "ETH: link is down\r\n" );
+	}
 
 
 
