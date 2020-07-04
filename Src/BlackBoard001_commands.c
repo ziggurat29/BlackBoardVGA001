@@ -454,12 +454,26 @@ typedef struct HeapInfo
 	int nAlloc;				//alloc blocks
 	size_t nSmallestAlloc;	//smallest alloc
 	size_t nLargestAlloc;	//largest alloc
+
+	//remember first 20 or so blocks; should be enough
+	struct Blocks {
+		uint32_t ptr;	//where
+		uint32_t size;	//how big; and flag in high bit for 'alloc'
+	} aBlocks[20];
 } HeapInfo;
 
 
 int StatsHWcbk ( void* pblk, uint32_t nBlkSize, int bIsAlloc, void* pinst )
 {
 	HeapInfo* hi = (HeapInfo*) pinst;
+
+	//we will try to record this block; it will be past all existing blocks
+	size_t nIdxBlock = hi->nAlloc + hi->nFree;
+	if ( nIdxBlock < COUNTOF(hi->aBlocks) )
+	{
+		hi->aBlocks[nIdxBlock].ptr = (uint32_t)pblk;
+		hi->aBlocks[nIdxBlock].size = nBlkSize | (bIsAlloc?0x80000000:0);
+	}
 
 	if ( bIsAlloc )
 	{
@@ -554,6 +568,26 @@ static CmdProcRetval cmdhdlDiag ( const IOStreamIF* pio, const char* pszszTokens
 		_cmdPutInt ( pio, (int)hi.nLargestAlloc, 0 );
 	}
 	_cmdPutCRLF(pio);
+
+	int nEndBlock = hi.nAlloc + hi.nFree;
+	if ( nEndBlock > COUNTOF(hi.aBlocks) )
+		nEndBlock = COUNTOF(hi.aBlocks);
+	for ( int nIdxBlock = 0; nIdxBlock < nEndBlock; ++nIdxBlock )
+	{
+		_cmdPutString ( pio, "    [" );
+		_cmdPutInt ( pio, nIdxBlock, 0 );
+		_cmdPutString ( pio, "]  " );
+		_cmdPutString ( pio, (hi.aBlocks[nIdxBlock].size&0x80000000?"ALLO":"free") );
+		_cmdPutString ( pio, "  @ 0x" );
+		_putHexUint32 ( pio, (uint32_t)hi.aBlocks[nIdxBlock].ptr );
+		_cmdPutString ( pio, "[" );
+		_cmdPutInt ( pio, (int)(hi.aBlocks[nIdxBlock].size&~0x80000000), 0 );
+		_cmdPutString ( pio, "]\r\n" );
+	}
+	if ( nEndBlock < hi.nAlloc + hi.nFree )
+	{
+		_cmdPutString ( pio, "    ...\r\n" );
+	}
 
 #if HAVE_UART1
 	_cmdPutString ( pio, "UART1 max RX queue: " );
