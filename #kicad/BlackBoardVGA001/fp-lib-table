@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name f_r_mini_din)(type KiCad)(uri C:/Users/person/Downloads/KiCad/f_r_mini_din.pretty)(options "")(descr ""))
+  (lib (name BlackBoardVGA001)(type KiCad)(uri ${KIPRJMOD}/BlackBoardVGA001.pretty)(options "")(descr ""))
+)

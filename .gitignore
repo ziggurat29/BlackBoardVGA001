@@ -15,11 +15,20 @@
 *.vcxproj.user
 *.opensdf
 
-#doc
-#hold
-#kicad
-Debug
-Release
+/#kicad/**/*.kicad_pcb-bak
+/#kicad/**/*.sch-bak
+/#kicad/**/*.net
+/#kicad/**/fp-info-cache
+/#kicad/**/report.txt
+/#kicad/**/*.dsn
+/#kicad/**/*.bin
+/#kicad/**/*.ses
+/#kicad/**/*.rules
+
+/#doc
+/#hold
+/Debug
+/Release
 
 Src/Backup
 Inc/Backup
