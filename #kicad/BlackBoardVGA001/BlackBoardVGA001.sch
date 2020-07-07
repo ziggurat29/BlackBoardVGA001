@@ -415,8 +415,6 @@ Text GLabel 10450 3000 2    50   BiDi ~ 0
 PA8
 Text GLabel 10450 3100 2    50   BiDi ~ 0
 PC8
-Text GLabel 10450 3200 2    50   BiDi ~ 0
-PC6
 Text GLabel 10450 3300 2    50   BiDi ~ 0
 PD14
 Text GLabel 10450 3400 2    50   BiDi ~ 0
@@ -1230,4 +1228,27 @@ Wire Wire Line
 NoConn ~ 1400 4650
 NoConn ~ 1400 4850
 NoConn ~ 2000 6000
+Text GLabel 10450 3200 2    50   BiDi ~ 0
+PC6
+NoConn ~ 10300 3100
+NoConn ~ 9800 3000
+NoConn ~ 9800 2800
+NoConn ~ 10300 2800
+NoConn ~ 10300 2700
+NoConn ~ 10300 2600
+NoConn ~ 9800 2600
+NoConn ~ 9800 2400
+NoConn ~ 7450 1800
+NoConn ~ 7950 1900
+NoConn ~ 7450 2000
+NoConn ~ 7950 2700
+NoConn ~ 7950 2400
+Text GLabel 2150 4650 2    50   BiDi ~ 0
+PE0
+Text GLabel 2150 4850 2    50   BiDi ~ 0
+PE1
+Wire Wire Line
+	2000 4650 2150 4650
+Wire Wire Line
+	2000 4850 2150 4850
 $EndSCHEMATC
