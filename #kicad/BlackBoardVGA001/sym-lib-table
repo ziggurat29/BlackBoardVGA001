@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name BlackBoardVGA001)(type Legacy)(uri ${KIPRJMOD}/BlackBoardVGA001.lib)(options "")(descr ""))
+  (lib (name BlackBoardVGA001-cache)(type Legacy)(uri C:/Experiments/BlackBoardVGA001/#kicad/BlackBoardVGA001/BlackBoardVGA001-cache.lib)(options "")(descr ""))
+)
